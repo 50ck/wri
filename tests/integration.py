@@ -4,7 +4,9 @@ import http.cookiejar, json, os, re, socket, subprocess, sys, tempfile, time, un
 import urllib.error, urllib.parse, urllib.request
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
-PHP = ['php', '-d', 'extension=pdo_sqlite']
+PHP = ['php']
+if subprocess.run(['php','-r','exit(extension_loaded("pdo_sqlite")?0:1);'],capture_output=True).returncode:
+    PHP += ['-d','extension=pdo_sqlite']
 LIVE = '--http' in sys.argv
 if LIVE: sys.argv.remove('--http')
 

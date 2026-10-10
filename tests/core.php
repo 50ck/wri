@@ -32,12 +32,15 @@ try {
     check($moved['slug']==='primera-entrada-3','Section deletion handles collisions');
     check((bool)one('SELECT * FROM redirects WHERE post_id=?',[$post]),'Redirect preserved');
     // Independent processes contend for the same SQLite writer lock.
+    $probe=proc_open([PHP_BINARY,'-r','exit(extension_loaded("pdo_sqlite")?0:1);'],[0=>['pipe','r'],1=>['pipe','w'],2=>['pipe','w']],$pipes);
+    foreach($pipes as $pipe)fclose($pipe);
+    $phpFlags=proc_close($probe)===0 ? [] : ['-d','extension=pdo_sqlite'];
     $children=[];
     for($i=0;$i<12;$i++) {
         $pid=pcntl_fork();if($pid===-1)throw new RuntimeException('fork failed');
         if($pid===0) {
             // exec gives each contender a fresh PDO connection and PHP runtime.
-            pcntl_exec(PHP_BINARY,['-d','extension=pdo_sqlite',__DIR__.'/section-worker.php',(string)$blog['id'],(string)$i]);
+            pcntl_exec(PHP_BINARY,array_merge($phpFlags,[__DIR__.'/section-worker.php',(string)$blog['id'],(string)$i]));
             exit(4);
         }$children[]=$pid;
     }
