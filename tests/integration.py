@@ -90,6 +90,7 @@ class Platform(unittest.TestCase):
         self.assertEqual(self.owner.request('/manage/settings','PUT')['status'],405)
         self.assertEqual(self.owner.request('/manage/settings','POST',length=262145)['status'],413)
         self.assertEqual(self.owner.request('/manage/settings','POST',type='application/json')['status'],400)
+        self.owner.request('/manage/settings')
         self.assertEqual(self.owner.request('/register','POST',{'csrf':self.owner.token,'username':['array']})['status'],400)
     def test_posts_edit_drafts_delete_and_markdown(self):
         url=self.create_post(status='draft')

@@ -36,8 +36,9 @@ try {
     for($i=0;$i<12;$i++) {
         $pid=pcntl_fork();if($pid===-1)throw new RuntimeException('fork failed');
         if($pid===0) {
-            // Inherited PDO connection is idle; no transaction crosses the fork.
-            try {add_section($blog,'Concurrent '.$i,'');exit(0);}catch(HttpError $e){exit($e->status===422?2:3);}catch(Throwable){exit(4);}
+            // exec gives each contender a fresh PDO connection and PHP runtime.
+            pcntl_exec(PHP_BINARY,['-d','extension=pdo_sqlite',__DIR__.'/section-worker.php',(string)$blog['id'],(string)$i]);
+            exit(4);
         }$children[]=$pid;
     }
     $success=0;$limited=0;
