@@ -119,7 +119,7 @@ Primary routes are `/`, `/register`, `/login`, POST `/logout`, `/{username}`, `/
 ./bin/test.sh --http
 ```
 
-The default suite runs 48 core checks and integration scenarios through the real front controller, PDO database and file sessions using a socket-free CLI harness. The concurrency check starts twelve independent PHP processes against one database and requires exactly ten section creations to succeed. The HTTP mode runs the same integration scenarios against the PHP development server using native Python HTTP/cookie handling. Neither mode requires a test framework or frontend dependencies. Test storage is isolated under temporary directories. Test-only Argon2 parameters are reduced for speed.
+The default suite runs 48 core checks and 18 integration scenarios through the real front controller, PDO database and file sessions using a socket-free CLI harness. The concurrency check starts twelve independent PHP processes against one database and requires exactly ten section creations to succeed. The HTTP mode runs the same integration scenarios against the PHP development server using native Python HTTP/cookie handling. Neither mode requires a test framework or frontend dependencies. Test storage is isolated under temporary directories. Test-only Argon2 parameters are reduced for speed.
 
 The implementation environment permitted core/request tests but prohibited opening sockets and did not provide working `doas`, Nginx or PHP-FPM. The HTTP mode, browser presentation/CSP enforcement and Nginx/FPM deployment must therefore be verified on the target server. No browser or production-server test result is claimed.
 
