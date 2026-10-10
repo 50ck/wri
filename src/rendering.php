@@ -16,7 +16,7 @@ function button(string $key,?string $name=null,?string $value=null): void { echo
 function page(string $key,callable $content,?string $error=null,?array $management=null): void {
     headers_for();
     echo '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e(t($key)).' · '.e(t('brand')).'</title><link rel="stylesheet" href="/assets/base.css"></head><body><a class="skip" href="#main">'.e(t('skip')).'</a>';
-    echo '<header>'.link_to('/','brand');
+    echo '<header>'.($key==='brand'?'':link_to('/','brand'));
     if ($management) {
         echo '<p>'.e(t('manage')).' / '.e($management['username']).'</p><nav aria-label="'.e(t('manage')).'">'.link_to('/manage/sections','sections').' '.link_to('/manage/appearance','appearance').' '.link_to('/manage/settings','settings').'</nav><div class="actions">'.link_to('/'.$management['username'],'blog').'<form class="inline" method="post" action="/logout">';token_field();button('logout');echo '</form></div>';
     }

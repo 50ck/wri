@@ -1,0 +1,8 @@
+<?php
+// Copy to /etc/blog/config.php (outside public/); readable only by the service.
+return [
+    'base_url' => 'https://blogs.example.com',
+    'database' => '/var/lib/blog/blog.sqlite',
+    'session_path' => '/var/lib/blog/sessions',
+    'registration' => true,
+];

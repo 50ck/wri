@@ -1,15 +1,25 @@
 #!/usr/bin/env python3
 """Full front-controller requests with real PDO/file sessions, no network needed."""
-import json, os, re, subprocess, tempfile, unittest
+import http.cookiejar, json, os, re, socket, subprocess, sys, tempfile, time, unittest
+import urllib.error, urllib.parse, urllib.request
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PHP = ['php', '-d', 'extension=pdo_sqlite']
+LIVE = '--http' in sys.argv
+if LIVE: sys.argv.remove('--http')
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args): return None
 
 class Client:
     def __init__(self, env, ip='127.0.0.1'):
         self.env, self.ip, self.session, self.token = env, ip, '', ''
+        self.cookies = http.cookiejar.CookieJar()
+        self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(self.cookies), NoRedirect())
     def request(self, path, method='GET', data=None, **extra):
         request = dict(path=path, method=method, data=data or {}, session=self.session, ip=self.ip, **extra)
+        if self.env.get('BLOG_TEST_HTTP'):
+            return self.http_request(request)
         result = subprocess.run(PHP + ['tests/request.php'], cwd=ROOT, env=self.env, input=json.dumps(request), text=True, capture_output=True, check=True)
         if result.stderr:
             raise AssertionError(result.stderr)
@@ -19,6 +29,23 @@ class Client:
         if tokens: self.token = tokens[0]
         response['location'] = next((h[10:] for h in response['headers'] if h.startswith('Location: ')), None)
         return response
+    def http_request(self, request):
+        data=request['data']; pairs=[]
+        for key, value in data.items():
+            if isinstance(value,list): pairs.extend((key+'[]',item) for item in value)
+            else: pairs.append((key,value))
+        body=urllib.parse.urlencode(pairs).encode() if request['method']=='POST' else None
+        if request.get('length',0)>262144: body=b'a'*(request['length'])
+        req=urllib.request.Request(self.env['BLOG_TEST_HTTP']+request['path'],data=body,method=request['method'],headers={'Content-Type':request.get('type','application/x-www-form-urlencoded')})
+        try: response=self.opener.open(req,timeout=10)
+        except urllib.error.HTTPError as error: response=error
+        with response:
+            result=dict(status=response.status,headers=[f'{k}: {v}' for k,v in response.headers.items()],body=response.read().decode(),location=response.headers.get('Location'))
+        self.session=next((cookie.value for cookie in self.cookies if cookie.name=='blog_session'),'')
+        tokens=re.findall(r'name="csrf" value="([a-f0-9]+)"',result['body'])
+        if tokens: self.token=tokens[0]
+        result['session']=self.session
+        return result
     def post(self, path, **data):
         return self.request(path, 'POST', dict(csrf=self.token, **data))
     def register(self, name):
@@ -32,9 +59,25 @@ class Platform(unittest.TestCase):
         cls.env = dict(os.environ, BLOG_DATABASE=cls.temp.name+'/test.sqlite', BLOG_SESSION_PATH=cls.temp.name+'/sessions', BLOG_ARGON_MEMORY='8192', BLOG_ARGON_TIME='1')
         subprocess.run(PHP+['bin/install.php'], cwd=ROOT, env=cls.env, check=True, capture_output=True)
         cls.counter = 0
+        cls.server = None
+        if LIVE:
+            sock=socket.socket();sock.bind(('127.0.0.1',0));port=sock.getsockname()[1];sock.close()
+            cls.env['BLOG_BASE_URL']=cls.env['BLOG_TEST_HTTP']=f'http://127.0.0.1:{port}'
+            cls.server_log=open(cls.temp.name+'/server.log','w')
+            cls.server=subprocess.Popen(PHP+['-S',f'127.0.0.1:{port}','-t','public','bin/dev-router.php'],cwd=ROOT,env=cls.env,stdout=cls.server_log,stderr=cls.server_log)
+            for _ in range(100):
+                try:
+                    urllib.request.urlopen(cls.env['BLOG_TEST_HTTP']+'/',timeout=1).close();break
+                except urllib.error.URLError: time.sleep(.05)
+            else: raise RuntimeError('HTTP test server did not start')
     @classmethod
-    def tearDownClass(cls): cls.temp.cleanup()
+    def tearDownClass(cls):
+        if cls.server:
+            cls.server.terminate();cls.server.wait(timeout=5);cls.server_log.close()
+        cls.temp.cleanup()
     def setUp(self):
+        if LIVE:
+            subprocess.run(PHP+['-r', 'require "src/bootstrap.php"; query("DELETE FROM rate_limits");'],cwd=ROOT,env=self.env,check=True,capture_output=True)
         type(self).counter += 1
         self.name = 'owner-'+str(self.counter)
         self.owner = Client(self.env, 'owner-'+str(self.counter))
