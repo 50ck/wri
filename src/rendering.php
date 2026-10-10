@@ -42,13 +42,14 @@ function icon_link(string $path,string $key,string $shape): void {
 }
 function render_blog(array $blog,?array $section=null,?array $post=null,bool $preview=false): void {
     headers_for($blog,$preview); $owner=is_owner($blog) && !$preview;
-    echo '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e(($post['title'] ?? $section['title'] ?? $blog['title'])).'</title><link rel="stylesheet" href="/assets/blog.css"><link rel="stylesheet" href="/'.e($blog['username']).'/style.css"></head><body class="blog"><a class="skip" href="#main">'.e(t('skip')).'</a><header class="blog-header"><h1 class="blog-title"><a href="/'.e($blog['username']).'">'.e($blog['title']).'</a></h1>';
+    echo '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e(($post['title'] ?? $section['title'] ?? $blog['title'])).'</title><link rel="stylesheet" href="/'.e($blog['username']).'/style.css"></head><body class="blog"><a class="skip" href="#main">'.e(t('skip')).'</a><header class="blog-header"><h1 class="blog-title"><a href="/'.e($blog['username']).'">'.e($blog['title']).'</a></h1>';
     if ($blog['description']!=='') echo '<p class="blog-description">'.e($blog['description']).'</p>';
     echo '<nav class="blog-nav" aria-label="'.e(t('sections')).'">'.link_to('/'.$blog['username'],'home');
     foreach (section_list($blog['id']) as $item) echo '<a href="/'.e($blog['username']).'/'.e($item['slug']).'">'.e($item['title']).'</a>';
     echo '</nav></header>';
     if ($owner) { echo '<div class="blog-owner">';icon_link('/'.$blog['username'].'/new','new_post','plus');icon_link('/manage','settings','settings');echo '</div>'; }
     echo '<main class="blog-main" id="main">';
+    if ($owner && isset($_SESSION['flash'])) { echo '<p class="feedback" role="status">'.e(t($_SESSION['flash'])).'</p>'; unset($_SESSION['flash']); }
     if ($post) {
         echo '<article class="blog-post"><h2 class="blog-post-title">'.e($post['title']).'</h2><p><time class="blog-post-date" datetime="'.e($post['published_at'] ?? $post['created_at']).'">'.e(substr($post['published_at'] ?? $post['created_at'],0,10)).'</time>'.($post['status']==='draft'?e(t('draft')):'').'</p><div class="blog-post-body">'.markdown($post['body_markdown']).'</div></article>';
         if ($owner) { echo '<div class="blog-owner">';icon_link('/'.$blog['username'].'/edit/'.$post['id'],'edit','pencil');icon_link('/'.$blog['username'].'/delete/'.$post['id'],'delete','trash');echo '</div>'; }
@@ -106,7 +107,7 @@ function manage_sections(array $blog): void {
 }
 function manage_appearance(array $blog,?string $error=null): void {
     page('appearance',function () use ($blog) {
-        echo '<form method="post" action="/manage/appearance">';token_field();area('css','css',value('css',$blog['custom_css']),true);echo '<small>'.e(t('css_help')).'</small><div class="actions">';button('apply');echo link_to('/manage/appearance/restore','restore').'</div></form><h2>'.e(t('preview')).'</h2><iframe title="'.e(t('preview')).'" sandbox="allow-same-origin" src="/'.e($blog['username']).'/preview"></iframe>';
+        echo '<form method="post" action="/manage/appearance">';token_field();area('css','css',value('css',$blog['custom_css'] ?: file_get_contents(dirname(__DIR__).'/public/assets/blog.css')),true);echo '<small>'.e(t('css_help')).'</small><div class="actions">';button('apply');echo link_to('/manage/appearance/restore','restore').'</div></form><h2>'.e(t('preview')).'</h2><iframe title="'.e(t('preview')).'" sandbox="allow-same-origin" src="/'.e($blog['username']).'/preview"></iframe>';
     },$error,$blog);
 }
 function manage_settings(array $blog,?string $error=null): void {

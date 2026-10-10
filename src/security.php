@@ -1,5 +1,9 @@
 <?php
 declare(strict_types=1);
+function send_header(string $header, bool $replace = true, int $status = 0): void {
+    if (PHP_SAPI === 'cli') $GLOBALS['response_headers'][] = $header;
+    if ($status) header($header, $replace, $status); else header($header, $replace);
+}
 class HttpError extends RuntimeException { public function __construct(public int $status, string $message) { parent::__construct($message); } }
 function fail(int $status, string $key): never { throw new HttpError($status, t($key)); }
 function input(string $name, ?array $source = null): string {
@@ -61,7 +65,7 @@ function rate_limit(string $scope, string $identity, int $limit, int $window): v
         $key = $scope . ':' . hash('sha256', $identity); $time=time();
         query('DELETE FROM rate_limits WHERE starts < ?', [$time - 86400]);
         $row=one('SELECT * FROM rate_limits WHERE bucket=?', [$key]);
-        if ($row && $time - $row['starts'] < $window && $row['attempts'] >= $limit) { header('Retry-After: ' . ($window - ($time-$row['starts']))); fail(429, 'rate_error'); }
+        if ($row && $time - $row['starts'] < $window && $row['attempts'] >= $limit) { send_header('Retry-After: ' . ($window - ($time-$row['starts']))); fail(429, 'rate_error'); }
         if (!$row || $time-$row['starts'] >= $window) query('INSERT INTO rate_limits VALUES (?,?,1) ON CONFLICT(bucket) DO UPDATE SET starts=excluded.starts, attempts=1', [$key,$time]);
         else query('UPDATE rate_limits SET attempts=attempts+1 WHERE bucket=?', [$key]);
     });
@@ -72,15 +76,15 @@ function owned_blog(): array {
 function is_owner(array $blog): bool { return (int)($blog['user_id']) === (int)(current_user()['id'] ?? 0); }
 function can_read(array $blog): void { if ($blog['visibility'] === 'private' && !is_owner($blog)) fail(404, 'unavailable'); }
 function headers_for(?array $blog = null, bool $preview = false): void {
-    header('Cache-Control: no-store, private'); header('X-Content-Type-Options: nosniff'); header('Referrer-Policy: no-referrer');
+    send_header('Cache-Control: no-store, private'); send_header('X-Content-Type-Options: nosniff'); send_header('Referrer-Policy: no-referrer');
     $origin=config()['base_url'];
     $styles = $origin . '/assets/base.css';
     if ($blog) $styles .= ' ' . $origin . '/assets/blog.css ' . $origin . '/' . $blog['username'] . '/style.css';
     $csp="default-src 'none'; script-src 'none'; style-src $styles; img-src 'none'; font-src 'none'; connect-src 'none'; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors " . ($preview ? "'self'" : "'none'");
     if (!$blog) $csp .= "; frame-src $origin";
     else $csp .= "; sandbox allow-same-origin" . ($preview ? '' : ' allow-top-navigation-by-user-activation');
-    header('Content-Security-Policy: ' . $csp);
-    header('X-Frame-Options: ' . ($preview ? 'SAMEORIGIN' : 'DENY'));
-    if (str_starts_with($origin, 'https://')) header('Strict-Transport-Security: max-age=31536000');
-    header('Content-Type: text/html; charset=utf-8');
+    send_header('Content-Security-Policy: ' . $csp);
+    send_header('X-Frame-Options: ' . ($preview ? 'SAMEORIGIN' : 'DENY'));
+    if (str_starts_with($origin, 'https://')) send_header('Strict-Transport-Security: max-age=31536000');
+    send_header('Content-Type: text/html; charset=utf-8');
 }

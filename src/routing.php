@@ -3,10 +3,10 @@ declare(strict_types=1);
 function redirect(string $path,int $status=303,?string $flash=null): never {
     if (!str_starts_with($path,'/') || str_starts_with($path,'//') || preg_match('/[\r\n]/',$path)) throw new LogicException('Unsafe redirect');
     if ($flash) $_SESSION['flash']=$flash;
-    header('Location: '.$path,true,$status);exit;
+    send_header('Location: '.$path,true,$status);exit;
 }
 function methods(array $allowed): void {
-    if (!in_array($_SERVER['REQUEST_METHOD'],$allowed,true)) { header('Allow: '.implode(', ',$allowed));fail(405,'method_error'); }
+    if (!in_array($_SERVER['REQUEST_METHOD'],$allowed,true)) { send_header('Allow: '.implode(', ',$allowed));fail(405,'method_error'); }
 }
 function submitted(callable $action): ?string {
     if ($_SERVER['REQUEST_METHOD']!=='POST') return null;
@@ -109,7 +109,7 @@ function route(): void {
     methods(['GET']);can_read($blog);
     if (!$tail) { render_blog($blog);return; }
     if ($tail===['style.css']) {
-        headers_for($blog);header('Content-Type: text/css; charset=utf-8');echo $blog['custom_css'];return;
+        headers_for($blog);send_header('Content-Type: text/css; charset=utf-8');echo $blog['custom_css'] ?: file_get_contents(dirname(__DIR__).'/public/assets/blog.css');return;
     }
     if ($tail===['preview']) { if (!is_owner($blog)) fail(403,'forbidden');render_blog($blog,null,null,true);return; }
     if (count($tail)===1) {
