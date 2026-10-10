@@ -70,7 +70,7 @@ Environment variables or a private PHP file specified by `BLOG_CONFIG` configure
 
 Keep Nginx `client_max_body_size`, PHP `post_max_size` and the application request limit aligned. URL encoding consumes part of the request budget: a large Unicode body may hit the request cap before the Markdown byte cap. Do not lower password hashing parameters without measuring the deployment's capacity and security needs. Sessions use strict PHP file sessions, HttpOnly, SameSite=Lax and Secure under the configured HTTPS origin. HTTPS cookies use the `__Host-` prefix, with no domain attribute.
 
-Fixed v1 rate limits: registration 5 attempts/IP/hour; login 30 attempts/IP/15 minutes and 10 attempts/normalized username/15 minutes; post creation 30 attempts/account/hour. Failed attempts count. Counters store hashed identities, expire after their window, and are pruned after a day. This is a small local abuse control, not distributed denial-of-service protection.
+Fixed v1 rate limits: registration 5 attempts/IP/hour; login 30 attempts/IP/15 minutes and 10 attempts/normalized username/15 minutes; post creation 30 attempts/account/hour; deletion password reauthentication 10 attempts/account/15 minutes. Failed attempts count. Counters store hashed identities, expire after their window, and are pruned after a day. This is a small local abuse control, not distributed denial-of-service protection.
 
 ## CSS security and selectors
 

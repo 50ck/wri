@@ -248,6 +248,56 @@ class Platform(unittest.TestCase):
         for _ in range(30):
             self.assertEqual(self.owner.post('/'+self.name+'/new',title='',body='',section_id='',status='draft')['status'],422)
         self.assertEqual(self.owner.post('/'+self.name+'/new',title='valid',body='',section_id='',status='draft')['status'],429)
+    def test_secure_cookie_configuration_and_strict_sessions(self):
+        if LIVE:
+            cookies=list(self.owner.cookies)
+            self.assertTrue(cookies)
+            cookie=cookies[0]
+            self.assertTrue(cookie.has_nonstandard_attr('HttpOnly'))
+            self.assertEqual(cookie.get_nonstandard_attr('SameSite'),'Lax')
+        else:
+            env=dict(self.env,BLOG_BASE_URL='https://blogs.example.test')
+            client=Client(env,'secure-cookie');client.session='attacker-chosen-session'
+            response=client.request('/login')
+            self.assertNotEqual(response['session'],'attacker-chosen-session')
+            self.assertTrue(response['cookie_params']['secure'])
+            self.assertTrue(response['cookie_params']['httponly'])
+            self.assertEqual(response['cookie_params']['samesite'],'Lax')
+            self.assertEqual(response['cookie_params']['path'],'/')
+    def test_deletion_reauthentication_is_limited(self):
+        self.owner.request('/manage/settings/delete')
+        for _ in range(10):
+            self.assertEqual(self.owner.post('/manage/settings/delete',password='wrong',confirmation=self.name)['status'],422)
+        self.assertEqual(self.owner.post('/manage/settings/delete',password='una contraseña larga',confirmation=self.name)['status'],429)
+        self.assertEqual(self.visitor.request('/'+self.name)['status'],200)
+    def test_pagination_and_invalid_page(self):
+        for index in range(21): self.create_post(title='Página '+str(index))
+        first=self.visitor.request('/'+self.name)
+        self.assertEqual(len(re.findall(r'<li>',first['body'])),20)
+        self.assertIn('?page=2',first['body'])
+        second=self.visitor.request('/'+self.name+'?page=2')
+        self.assertEqual(len(re.findall(r'<li>',second['body'])),1)
+        bad=self.visitor.request('/'+self.name+'?page=-1')
+        self.assertEqual(bad['status'],400)
+        self.assertEqual(bad['body'].count('<!doctype html>'),1)
+    def test_css_does_not_cross_blogs(self):
+        self.owner.request('/manage/appearance')
+        self.assertEqual(self.owner.post('/manage/appearance',css='body {color: hotpink}')['status'],303)
+        other=Client(self.env,'css-other');other.register('css-other')
+        self.assertNotIn('hotpink',other.request('/css-other/style.css')['body'])
+        self.assertNotIn('/'+self.name+'/style.css',other.request('/css-other')['body'])
+        self.assertNotIn('/'+self.name+'/style.css',self.owner.request('/login')['body'])
+    def test_disabled_registration_and_configured_post_cap(self):
+        if LIVE: self.skipTest('Configuration variations are exercised by the CLI request harness')
+        disabled=Client(dict(self.env,BLOG_REGISTRATION='0'),'disabled')
+        self.assertEqual(disabled.request('/register')['status'],403)
+        self.assertNotIn('name="username"',disabled.request('/')['body'])
+        limited=Client(dict(self.env,BLOG_POST_LIMIT='1'),'limited');limited.session=self.owner.session
+        limited.request('/'+self.name+'/new')
+        self.assertEqual(limited.post('/'+self.name+'/new',title='First',body='body',section_id='',status='published')['status'],303)
+        limited.request('/'+self.name+'/new')
+        self.assertEqual(limited.post('/'+self.name+'/new',title='Second',body='body',section_id='',status='published')['status'],422)
+
     def test_size_limits_and_no_javascript(self):
         self.owner.request('/manage/appearance')
         self.assertEqual(self.owner.post('/manage/appearance',css='a'*65537)['status'],413)

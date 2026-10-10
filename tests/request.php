@@ -9,6 +9,6 @@ if (!empty($request['session'])) session_id($request['session']);
 ob_start();
 register_shutdown_function(function () {
     $body=ob_get_clean();
-    echo json_encode(['status'=>http_response_code()?:200,'headers'=>$GLOBALS['response_headers']??[],'session'=>session_id(),'body'=>$body],JSON_THROW_ON_ERROR|JSON_INVALID_UTF8_SUBSTITUTE);
+    echo json_encode(['status'=>http_response_code()?:200,'headers'=>$GLOBALS['response_headers']??[],'session'=>session_id(),'body'=>$body,'cookie_params'=>session_get_cookie_params()],JSON_THROW_ON_ERROR|JSON_INVALID_UTF8_SUBSTITUTE);
 });
 require dirname(__DIR__).'/public/index.php';
