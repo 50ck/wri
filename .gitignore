@@ -1,0 +1,4 @@
+/storage/*
+!/storage/.gitkeep
+/config/local.php
+*.log
