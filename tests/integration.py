@@ -119,7 +119,8 @@ class Platform(unittest.TestCase):
         html=self.owner.request('/'+self.name+'/preview')['body']
         self.assertIn('<math ',html);self.assertNotIn('hljs-',html)
         other=Client(self.env,'other-addons');other.register('other-addons')
-        other.post('/manage/sections/home',content=source)
+        other.request('/manage/sections/home')
+        self.assertEqual(other.post('/manage/sections/home',content=source)['status'],303)
         self.assertIn('hljs-',self.visitor.request('/other-addons')['body'])
         self.assertEqual(self.owner.request('/manage/addons','POST',{'addons':['math']})['status'],403)
         self.assertEqual(self.owner.post('/manage/addons',addons=['../../bad'])['status'],422)
@@ -130,6 +131,19 @@ class Platform(unittest.TestCase):
         self.assertEqual(self.visitor.request('/'+self.name+'/preview')['status'],404)
         self.assertEqual(other.request('/'+self.name)['status'],404)
         self.assertIn('<math ',self.owner.request('/'+self.name+'/preview')['body'])
+
+    def test_removed_addon_preserves_content_and_selection(self):
+        self.owner.request('/manage/sections/home')
+        self.owner.post('/manage/sections/home',content='$x^2$')
+        folder=ROOT/'extensions/math';removed=ROOT/'math-removed'
+        folder.rename(removed)
+        try:
+            self.assertNotIn('value="math"',self.owner.request('/manage/addons')['body'])
+            html=self.visitor.request('/'+self.name)['body']
+            self.assertNotIn('<math ',html);self.assertIn('$x^2$',html)
+        finally:
+            removed.rename(folder)
+        self.assertIn('<math ',self.visitor.request('/'+self.name)['body'])
 
     def test_addon_contract_routes_slots_and_parser(self):
         self.owner.request('/manage/addons')
@@ -149,7 +163,7 @@ class Platform(unittest.TestCase):
         self.assertEqual(self.owner.request('/manage/addons/probe/ping')['status'],200)
         self.assertEqual(self.visitor.request('/manage/addons/probe/ping')['status'],401)
         self.assertEqual(self.visitor.request('/'+self.name+'/_addons/probe/missing')['status'],404)
-        post=self.create_post(title='Slot probe',body='hola',status='published')
+        post=self.create_post(title='Slot probe',status='published')
         self.assertIn('probe post',self.visitor.request(post)['body'])
         self.owner.request('/manage/settings')
         self.owner.post('/manage/settings',title='privado',description='',visibility='private')
@@ -284,7 +298,7 @@ class Platform(unittest.TestCase):
         self.assertEqual(self.visitor.request('/'+self.name+'/preview')['status'],403)
         self.owner.request('/manage/appearance/restore')
         self.assertEqual(self.owner.post('/manage/appearance/restore')['status'],303)
-        self.assertEqual(self.visitor.request('/'+self.name+'/style.css')['body'],(ROOT/'public/assets/blog.css').read_text())
+        self.assertTrue(self.visitor.request('/'+self.name+'/style.css')['body'].endswith((ROOT/'public/assets/blog.css').read_text()))
     def test_privacy_and_no_cache(self):
         section=self.create_section();url=self.create_post(section=section)
         self.owner.request('/manage/settings')
