@@ -2,7 +2,7 @@
 
 A small multi-user blog engine: PHP 8.4/8.5, PDO SQLite, native forms and CSS. All interface text is English. No JavaScript, framework, build process, uploads or external runtime services.
 
-Users register and immediately receive `/{username}`. Each account has one blog with two built-in sections: `inicio` at `/{username}` holds one editable Markdown text, and `blogs` at `/{username}/blogs` lists its posts. The homepage text is editable from its pencil link or `/manage/sections/home`. These permanent pages do not count toward the ten additional custom sections. Each blog also has drafts and published posts, one global stylesheet, private/public visibility and password-confirmed account deletion. Owner actions appear inside their blog; `/manage` has sections, appearance, settings and addons. Section removal and post moves preserve old article URLs through redirects.
+Users register and immediately receive `/{username}`. Each account has one blog with two built-in sections: `inicio` at `/{username}` holds one editable Markdown text, and `blogs` at `/{username}/blogs` lists its posts. The homepage text is editable from its pencil link or `/manage/sections/home`. These permanent pages do not count toward the ten additional custom sections. Each blog also has drafts and published posts, one global stylesheet, private/public visibility and password-confirmed account deletion. Owner actions appear inside their blog; `/manage` opens settings; navigation follows settings, sections, appearance and addons. Section management uses one plain list with edit links beside titles. Section removal and post moves preserve old article URLs through redirects.
 
 ## Install
 

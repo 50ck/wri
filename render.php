@@ -22,7 +22,7 @@ function page(string $key,callable $content,?string $error=null,?array $manageme
     foreach ($styles as $id) echo '<link rel="stylesheet" href="/_addons/'.e($id).'/style.css">';
     echo '</head><body><a class="skip" href="#main">'.e(t('skip')).'</a>';
     if ($management) {
-        echo '<header><p>'.e(t('manage')).' / '.e($management['username']).'</p><nav aria-label="'.e(t('manage')).'">'.link_to('/manage/sections','sections').' '.link_to('/manage/appearance','appearance').' '.link_to('/manage/settings','settings').' '.link_to('/manage/addons','addons').'</nav><div class="actions">'.link_to('/'.$management['username'],'blog').'<form class="inline" method="post" action="/logout">';token_field();button('logout');echo '</form></div></header>';
+        echo '<header><p>'.e(t('manage')).' / '.e($management['username']).'</p><nav aria-label="'.e(t('manage')).'">'.link_to('/manage/settings','settings').' '.link_to('/manage/sections','sections').' '.link_to('/manage/appearance','appearance').' '.link_to('/manage/addons','addons').'</nav><div class="actions">'.link_to('/'.$management['username'],'blog').'<form class="inline" method="post" action="/logout">';token_field();button('logout');echo '</form></div></header>';
     }
     echo '<main id="main"><h1>'.e(t($key)).'</h1>';
     if ($error) echo '<p class="error" role="alert">'.e($error).'</p>';
@@ -118,12 +118,12 @@ function confirmation(string $key,string $help,string $cancel,?array $management
 }
 function manage_sections(array $blog): void {
     page('sections',function () use ($blog) {
-        $sections=section_list($blog['id']);echo '<ul class="section-list"><li>'.e(t('home')).'<div class="actions">'.link_to('/manage/sections/home','edit').'</div></li><li>'.link_to('/'.$blog['username'].'/blogs','blogs').'</li></ul><p>'.count($sections).' '.e(t('section_count')).'</p><ul class="section-list">';
+        $sections=section_list($blog['id']);echo '<p>'.count($sections).' '.e(t('section_count')).'</p><ul class="section-list"><li>'.link_to('/'.$blog['username'],'home').' <span class="section-edit">'.link_to('/manage/sections/home','edit').'</span></li><li>'.link_to('/'.$blog['username'].'/blogs','blogs').'</li>';
         foreach ($sections as $i=>$section) {
             $path='/manage/sections/'.$section['id'];
-            echo '<li>'.e($section['title']).'<div class="actions">'.link_to($path.'/edit','edit').' '.link_to($path.'/delete','delete');
-            echo '<form class="inline" method="post" action="'.$path.'/reorder">';token_field();
-            if ($i>0) button('up','direction','up');if ($i<count($sections)-1) button('down','direction','down');echo '</form></div></li>';
+            echo '<li><a href="/'.e($blog['username']).'/'.e($section['slug']).'">'.e($section['title']).'</a> <span class="section-edit">'.link_to($path.'/edit','edit').'</span> '.link_to($path.'/delete','delete');
+            echo ' <form class="inline" method="post" action="'.$path.'/reorder">';token_field();
+            if ($i>0) button('up','direction','up');if ($i<count($sections)-1) button('down','direction','down');echo '</form></li>';
         } echo '</ul>';if (count($sections)<10) echo link_to('/manage/sections/new','new_section');
     },null,$blog);
 }

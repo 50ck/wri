@@ -3,7 +3,7 @@ declare(strict_types=1);
 function route_manage(string $path): void {
     if ($path==='/manage' || str_starts_with($path,'/manage/')) {
         $blog=owned_blog();
-        if ($path==='/manage') { methods(['GET']);redirect('/manage/sections'); }
+        if ($path==='/manage') { methods(['GET']);redirect('/manage/settings'); }
         if ($path==='/manage/addons') {
             methods(['GET','POST']);$error=submitted(function () use($blog) {save_addons($blog,$_POST['addons']??[]);redirect('/manage/addons',303,'saved');});manage_addons($blog,$error);return;
         }
