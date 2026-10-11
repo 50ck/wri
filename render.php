@@ -64,9 +64,9 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
         addon_slot('post_after',$blog,$post);
         if ($owner) { echo '<div class="blog-owner">';icon_link('/'.$blog['username'].'/edit/'.$post['id'],'edit','pencil');icon_link('/'.$blog['username'].'/delete/'.$post['id'],'delete','trash');echo '</div>'; }
     } elseif (!$section && !$feed) {
-        echo '<article class="blog-section blog-home"><h2>'.e(t('home'));
-        if ($owner) { echo ' ';icon_link('/manage/sections/home','edit_home','pencil'); }
-        echo '</h2>'.$html.'</article>';
+        echo '<article class="blog-section blog-home">';
+        if ($owner) { echo '<div class="blog-owner">';icon_link('/manage/sections/home','edit_home','pencil');echo '</div>'; }
+        echo $html.'</article>';
     } else {
         if ($section) echo '<section class="blog-section"><h2>'.e($section['title']).'</h2>'.$html.'</section>';
         else {
