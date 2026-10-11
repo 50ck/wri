@@ -79,7 +79,7 @@ function markdown(string $body): string {
                 if ($fragment->appendXML(str_replace(' xmlns="http://www.w3.org/2000/svg"','',$svg))) {
                     $wrapper=$doc->createElement('div'); $wrapper->setAttribute('class','blog-diagram');
                     $wrapper->setAttribute('tabindex','0'); $wrapper->setAttribute('role','region');
-                    $wrapper->setAttribute('aria-label',t('flowchart')); $wrapper->appendChild($fragment);
+                    $wrapper->setAttribute('aria-label',t('diagram')); $wrapper->appendChild($fragment);
                     $pre=$code->parentNode; $pre->parentNode->replaceChild($wrapper,$pre);
                 }
             } else {

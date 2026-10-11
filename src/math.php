@@ -59,8 +59,10 @@ function math_element(DOMDocument $doc,string $tex,string $display): ?DOMElement
             if (str_starts_with($class,'Latex2MathML\\')) require dirname(__DIR__).'/vendor/latex2mathml/src/'.str_replace('\\','/',substr($class,13)).'.php';
         }); $loaded=true;
     }
+    set_error_handler(static function (int $level,string $message): never { throw new ErrorException($message,0,$level); });
     try { $math=\Latex2MathML\Converter::convert_to_element($tex,$doc,display:$display,xmlns:''); }
     catch (Throwable) { return null; }
+    finally { restore_error_handler(); }
     $allowed=['math','mrow','mi','mo','mn','mtext','ms','mspace','mfrac','msqrt','mroot','msub','msup','msubsup','munder','mover','munderover','mtable','mtr','mtd','mlabeledtr','mstyle','mpadded','mphantom','menclose','mfenced','mmultiscripts','mprescripts','none'];
     $attributes=['display','stretchy','notation','scriptlevel','width','lspace','rspace','voffset','height','depth','columnalign','rowalign','displaystyle','mathvariant','fence','form','rowspacing','columnspacing','symmetric','linethickness','columnlines','rowlines','accent','accentunder','separator','minsize','maxsize','columnspan','rowspan'];
     foreach (array_merge([$math],iterator_to_array($math->getElementsByTagName('*'))) as $node) {

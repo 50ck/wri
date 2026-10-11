@@ -6,6 +6,7 @@ if (PHP_OS_FAMILY!=='Linux' || php_uname('m')!=='x86_64') {
     fwrite(STDERR,"Install mmdr 0.3.1 for your platform and set BLOG_MERMAID_BIN. See README.md.\n");exit(1);
 }
 $root=dirname(__DIR__);$dir=sys_get_temp_dir().'/blog-renderer-'.bin2hex(random_bytes(8));mkdir($dir,0700);
+$exitCode=0;
 try {
     $url='https://github.com/1jehuang/mermaid-rs-renderer/releases/download/v0.3.1/mmdr-x86_64-unknown-linux-gnu.tar.gz';
     $context=stream_context_create(['http'=>['timeout'=>30,'user_agent'=>'blogs installer'],'ssl'=>['verify_peer'=>true,'verify_peer_name'=>true]]);
@@ -19,5 +20,6 @@ try {
     // Copy then rename in the destination filesystem for an atomic installation.
     if (!copy($dir.'/mmdr',$root.'/bin/mmdr.new') || !chmod($root.'/bin/mmdr.new',0755) || !rename($root.'/bin/mmdr.new',$root.'/bin/mmdr')) throw new RuntimeException('Installation failed');
     echo "mmdr 0.3.1 installed in bin/mmdr.\n";
-} catch (Throwable $error) { fwrite(STDERR,$error->getMessage()."\n");exit(1); }
+} catch (Throwable $error) { fwrite(STDERR,$error->getMessage()."\n");$exitCode=1; }
 finally { foreach (glob($dir.'/*') as $file) unlink($file);rmdir($dir); }
+exit($exitCode);

@@ -145,6 +145,48 @@ try {
     check(mermaid_svg("flowchart LR\n".str_repeat("A --> B\n",81))===null,'Diagram edge limit');
     check(substr_count(markdown(str_repeat("```mermaid\nflowchart LR\nA --> B\n```\n\n",17)),'class="mermaid-diagram"')===16,'Per-document diagram limit');
     check(!str_contains(markdown("<svg onload=alert(1)><script>evil</script></svg>"),'<svg'),'Raw user SVG remains escaped');
+    $mathematics=markdown(file_get_contents(__DIR__.'/fixtures/math-stress.md'));
+    $mathDoc=new DOMDocument();$mathDoc->loadHTML('<?xml encoding="UTF-8">'.$mathematics,LIBXML_NOERROR|LIBXML_NOWARNING);$mathPath=new DOMXPath($mathDoc);
+    check($mathDoc->getElementsByTagName('math')->length===44 && !$mathDoc->getElementsByTagName('pre')->length,'All 44 stress formulas render without raw blocks');
+    check($mathPath->query('//math[@display="inline"]')->length===23 && $mathPath->query('//math[@display="block"]')->length===21,'Inline versus display formulas');
+    foreach (['mfrac','msqrt','mroot','msubsup','mtable','mover','munder','munderover','menclose'] as $tag) check($mathDoc->getElementsByTagName($tag)->length>0,'Native MathML '.$tag);
+    check($mathPath->query('//mtable[mtr[8]]/mtr/mtd')->length===64,'Eight by eight matrix preserves all cells');
+    check($mathPath->query('//mtable/mtr/mtd/mrow/mstyle/mi[text()="h"]')->length===1,'Last matrix cell preserves grouped arrow label');
+    check($mathPath->query('//mtable[@rowlines="none solid none"]')->length===1,'Horizontal matrix rule retains correct row');
+    check(str_contains($mathematics,'penalización') && str_contains($mathematics,'suavidad'),'Unicode formula annotations preserved');
+    $delimiters=markdown('Inline $x^2$ and \(\frac{1}{2}\).'."\n\n".'\[\sqrt{x}\]'."\n\n".'$$x+1$$'."\n\n```math\nx^2\n```");
+    check(substr_count($delimiters,'<math ')===5,'Dollar, parenthesis, bracket and math-fence delimiters');
+    $literal=markdown('Precio: $5 y $10. Literal: \$x$. ` $x^2$ `'."\n\n```text\n$x+1$\n$$x$$\n```");
+    check(!str_contains($literal,'<math ') && str_contains($literal,'$5 y $10'),'Currency, escaped dollars and code remain literal');
+    check(str_contains(markdown("$$\nx+1"),'$$') && !str_contains(markdown("$$\nx+1"),'<math '),'Unclosed display delimiter preserves source');
+    check(math_element(new DOMDocument(),str_repeat('{',49).'x'.str_repeat('}',49),'inline')===null && math_element(new DOMDocument(),str_repeat('x',4097),'inline')===null,'Formula depth and size limits');
+    check(substr_count(markdown(str_repeat('$x$ ',129)),'<math ')===128,'Formula count limit');
+    $unsafeMath=markdown('$\text{<script>alert(1)</script>}$ $\href{https://evil.test}{test}$');
+    $unsafeDoc=new DOMDocument();$unsafeDoc->loadHTML('<?xml encoding="UTF-8">'.$unsafeMath,LIBXML_NOERROR|LIBXML_NOWARNING);$unsafePath=new DOMXPath($unsafeDoc);
+    check(!$unsafeDoc->getElementsByTagName('script')->length && !$unsafePath->query('//*[@href or @style or @onclick or @onerror]')->length,'Formula output cannot introduce active content');
+    check(!str_contains(markdown('<math href="javascript:alert(1)"><mi>x</mi></math>'),'<math '),'Raw user MathML remains escaped');
+    $maliciousSvg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" onload="alert(1)"><script>evil</script><foreignObject><p xmlns="http://www.w3.org/1999/xhtml">evil</p></foreignObject><image href="https://tracker.test"/><style>body{color:red}</style><path d="M0 0 L10 10" style="stroke:red" fill="url(https://tracker.test)"/><a href="javascript:alert(1)"><text>link</text></a></svg>';
+    $clean=sanitize_diagram_svg($maliciousSvg,'safe source');
+    check($clean!==null && !preg_match('/<(?:script|foreignObject|image|style|a)\b|onload=|href=|style=|url\(https:/i',$clean),'Native SVG removes active elements, links, styles and resource references');
+    check(sanitize_diagram_svg('<!DOCTYPE svg [<!ENTITY x SYSTEM "file:///etc/passwd">]><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">&x;</svg>','')===null,'SVG entities and document types rejected');
+    check(sanitize_diagram_svg('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100000 100"/>','')===null,'SVG dimensions bounded');
+    $markers='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><marker id="arrow"><path d="M0 0L1 1"/></marker></defs><path marker-end="url(#arrow)" d="M0 0L10 10"/></svg>';
+    $first=sanitize_diagram_svg($markers,'first');$second=sanitize_diagram_svg($markers,'second');
+    preg_match('/id="([^"]+)"/',$first,$firstId);preg_match('/id="([^"]+)"/',$second,$secondId);
+    check($firstId[1]!==$secondId[1] && str_contains($first,'url(#'.$firstId[1].')'),'Diagram marker IDs are isolated and references preserved');
+    $binary=dirname(__DIR__).'/bin/mmdr';
+    if (is_executable($binary)) {
+        preg_match_all('/```mermaid\n(.*?)```/s',file_get_contents(__DIR__.'/fixtures/diagram-stress.md'),$corpus);
+        foreach ($corpus[1] as $index=>$source) {
+            $rendered=native_diagram($source,$binary,microtime(true)+3);
+            check($rendered!==null && str_contains($rendered,'mermaid-native'),'Native stress diagram '.$index);
+            check(!preg_match('/<script|<foreignObject|<image|\sstyle=|\shref=|\sonload=/i',$rendered),'Native stress diagram remains inert '.$index);
+        }
+        check(native_diagram(str_repeat('x',8193),$binary,microtime(true)+3)===null,'Native diagram source limit');
+        check(native_diagram('flowchart LR;A-->B',$binary,microtime(true)-1)===null,'Native render deadline');
+        $slow=$dir.'/slow-renderer';file_put_contents($slow,"#!/bin/sh\nexec sleep 5\n");chmod($slow,0700);
+        $started=microtime(true);check(native_diagram('flowchart LR;A-->B',$slow,microtime(true)+.05)===null && microtime(true)-$started<1,'Slow renderer is terminated');
+    } else echo "Native Mermaid corpus skipped: run php bin/install-renderer.php.\n";
     check(e('<"&')==='&lt;&quot;&amp;','HTML escaping');
     delete_post($blog,$post);rejects(fn()=>owned_post($blog,$post),404);
     rejects(fn()=>delete_account($blog,'wrong','alice'),422);
