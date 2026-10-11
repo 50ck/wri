@@ -134,12 +134,13 @@ function manage_settings(array $blog,?string $error=null): void {
         echo '<form method="post">';token_field();field('title','title',value('title',$blog['title']),'text',true,120);field('description','description',value('description',$blog['description']),'text',false,280);
         echo '<label for="visibility">'.e(t('visibility')).'</label><select name="visibility" id="visibility">';
         foreach (['public','private'] as $state) echo '<option value="'.$state.'"'.(value('visibility',$blog['visibility'])===$state?' selected':'').'>'.e(t($state)).'</option>';
-        echo '</select><div class="actions">';button('save');echo '</div></form><p>'.link_to('/manage/settings/delete','delete_blog').'</p>';
+        echo '</select><div class="actions">';button('save');echo '</div></form>';
+        if (!is_admin()) echo '<p>'.link_to('/manage/settings/delete','delete_blog').'</p>';
     },$error,$blog);
 }
 function delete_blog_form(array $blog,?string $error=null): void {
     page('delete_blog',function () {
-        echo '<p>'.e(t('delete_blog_help')).'</p><form method="post">';token_field();field('password','password','','password');field('confirmation','type_username',value('confirmation'),'text');echo '<div class="actions">'.link_to('/manage/settings','cancel');button('delete_permanently');echo '</div></form>';
+        echo '<form method="post">';token_field();field('password','password','','password');field('confirmation','type_username',value('confirmation'),'text');echo '<div class="actions">'.link_to('/manage/settings','cancel');button('delete_permanently');echo '</div></form>';
     },$error,$blog);
 }
 
@@ -174,7 +175,7 @@ function manage_admin(array $blog,?string $error=null): void {
             echo '<li><a href="/'.e($user['username']).'">'.e($user['username']).'</a>';
             echo ' <span class="section-actions">';
             icon_link('/manage/admin/users/'.$user['user_id'].'/edit','edit','pencil');echo ' ';
-            icon_link('/manage/admin/users/'.$user['user_id'].'/delete','delete','trash');
+            if ((int)$user['user_id']!==(int)platform_settings()['admin_user_id']) { echo ' ';icon_link('/manage/admin/users/'.$user['user_id'].'/delete','delete','trash'); }
             if ($user['visibility']==='public' && (int)$user['id']!==(int)$home) {
                 echo ' '.link_to('/manage/admin/homepage?blog_id='.$user['id'],'use_blog_home');
             } elseif ($user['visibility']==='private') echo ' '.e(t('private'));
@@ -200,7 +201,7 @@ function admin_user_editor(array $blog,array $user,?string $error=null): void {
 }
 function admin_user_delete(array $blog,array $user,?string $error=null): void {
     page('delete_user',function () use($user) {
-        echo '<p>'.e($user['username']).'</p><p>'.e(t('delete_blog_help')).'</p><form method="post">';token_field();
+        echo '<p>'.e($user['username']).'</p><form method="post">';token_field();
         field('password','your_password','','password');field('confirmation','type_username');
         echo '<div class="actions">'.link_to('/manage/admin','cancel');button('delete_permanently');echo '</div></form>';
     },$error,$blog);

@@ -122,6 +122,7 @@ function admin_delete_user(int $id,string $password,string $confirmation): void 
     rate_limit('admin-delete',(string)$admin['id'],10,900);
     transaction(static function () use($id,$password,$confirmation,$admin) {
         $user=admin_user($id);
+        if ($id===(int)platform_settings()['admin_user_id']) fail(403,'forbidden');
         if (!password_check($password,$admin['password_hash']) || !hash_equals($user['username'],$confirmation)) fail(422,'delete_error');
         query('DELETE FROM users WHERE id=?',[$id]);
     });
@@ -281,6 +282,7 @@ function save_settings(array $blog,string $title,string $description,string $vis
 }
 function delete_account(array $blog,string $password,string $confirmation): void {
     transaction(function () use ($blog,$password,$confirmation) {
+        if ((int)$blog['user_id']===(int)platform_settings()['admin_user_id']) fail(403,'forbidden');
         $user=one('SELECT * FROM users WHERE id=?',[$blog['user_id']]);
         if (!$user || !password_check($password,$user['password_hash']) || !hash_equals($user['username'],$confirmation)) fail(422,'delete_error');
         query('DELETE FROM users WHERE id=?',[$user['id']]);

@@ -6,6 +6,7 @@ function route_manage(string $path): void {
         if ($path==='/manage') { methods(['GET']);redirect('/manage/settings'); }
         if (preg_match('~\A/manage/admin/users/([1-9][0-9]*)/(edit|delete)\z~',$path,$m)) {
             require_admin();methods(['GET','POST']);$user=admin_user((int)$m[1]);$self=$user['id']===$blog['user_id'];
+            if ($m[2]==='delete' && $self) fail(403,'forbidden');
             if ($m[2]==='edit') {
                 $error=submitted(function () use($user,$self) {
                     admin_edit_user($user['id'],input('username'),input('new_password'),input('confirm_password'),input('visibility'));
@@ -59,6 +60,7 @@ function route_manage(string $path): void {
             methods(['GET','POST']);$error=submitted(function () use($blog) {save_settings($blog,input('title'),input('description'),input('visibility'));redirect('/manage/settings',303,'saved');});manage_settings($blog,$error);return;
         }
         if ($path==='/manage/settings/delete') {
+            if (is_admin()) fail(403,'forbidden');
             methods(['GET','POST']);$error=submitted(function () use($blog) {rate_limit('reauth',(string)$blog['user_id'],10,900);delete_account($blog,input('password'),input('confirmation'));logout();redirect('/');});delete_blog_form($blog,$error);return;
         }
         fail(404,'not_found');
