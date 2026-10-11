@@ -25,7 +25,9 @@ function slug_base(string $title): string {
     return $slug;
 }
 function free_section_slug(int $blog, string $title): string {
-    $base=slug_base($title); $slug=$base; $i=2;
+    $base=slug_base($title);
+    if (in_array($base,section_reserved_names(),true)) $base='seccion';
+    $slug=$base; $i=2;
     while (one('SELECT id FROM sections WHERE blog_id=? AND slug=?',[$blog,$slug])) $slug=$base.'-'.$i++;
     return $slug;
 }
@@ -117,4 +119,9 @@ function delete_account(array $blog,string $password,string $confirmation): void
         if (!$user || !password_check($password,$user['password_hash']) || !hash_equals($user['username'],$confirmation)) fail(422,'delete_error');
         query('DELETE FROM users WHERE id=?',[$user['id']]);
     });
+}
+
+function save_home(array $blog,string $content): void {
+    $content=markdown_field($content);
+    query('UPDATE blogs SET home_markdown=?,updated_at=? WHERE id=? AND user_id=?',[$content,now(),$blog['id'],$blog['user_id']]);
 }

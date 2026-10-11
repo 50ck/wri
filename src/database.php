@@ -21,11 +21,14 @@ function transaction(callable $fn): mixed {
 function migrate(): void {
     db()->exec('PRAGMA journal_mode = WAL');
     db()->exec('CREATE TABLE IF NOT EXISTS migrations (version TEXT PRIMARY KEY, applied_at TEXT NOT NULL)');
-    foreach (glob(dirname(__DIR__) . '/database/migrations/*.sql') as $file) {
+    $files=glob(dirname(__DIR__) . '/database/migrations/*.{sql,php}', GLOB_BRACE);
+    sort($files);
+    foreach ($files as $file) {
         transaction(function () use ($file) {
             $version = basename($file);
             if (!one('SELECT version FROM migrations WHERE version=?', [$version])) {
-                db()->exec(file_get_contents($file));
+                if (str_ends_with($file,'.php')) require $file;
+                else db()->exec(file_get_contents($file));
                 query('INSERT INTO migrations VALUES (?,?)', [$version, now()]);
             }
         });

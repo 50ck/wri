@@ -55,6 +55,9 @@ function route(): void {
         $blog=owned_blog();
         if ($path==='/manage') { methods(['GET']);redirect('/manage/sections'); }
         if ($path==='/manage/sections') { methods(['GET']);manage_sections($blog);return; }
+        if ($path==='/manage/sections/home') {
+            methods(['GET','POST']);$error=submitted(function () use($blog) {save_home($blog,input('content'));redirect('/'.$blog['username'],303,'saved');});home_editor($blog,$error);return;
+        }
         if ($path==='/manage/sections/new') {
             methods(['GET','POST']);$error=submitted(function () use($blog) {add_section($blog,input('title'),input('content'));redirect('/manage/sections',303,'section_created');});section_editor($blog,null,$error);return;
         }
@@ -102,12 +105,14 @@ function route(): void {
                     redirect(post_path($blog,owned_post($blog,$post['id'])),303,input('status')==='published'?'published':'saved');
                 });post_editor($blog,$post,$error);return;
             }
-            methods(['GET','POST']);submitted(function () use($blog,$post) {delete_post($blog,$post['id']);redirect('/'.$blog['username'],303,'deleted');});confirmation('delete_post','delete_post_help',post_path($blog,$post));return;
+            methods(['GET','POST']);submitted(function () use($blog,$post) {delete_post($blog,$post['id']);redirect('/'.$blog['username'].'/blogs',303,'deleted');});confirmation('delete_post','delete_post_help',post_path($blog,$post));return;
         }
         fail(404,'not_found');
     }
     methods(['GET']);can_read($blog);
     if (!$tail) { render_blog($blog);return; }
+    if ($tail===['inicio']) redirect('/'.$blog['username'],308);
+    if ($tail===['blogs']) { render_blog($blog,feed:true);return; }
     if ($tail===['style.css']) {
         headers_for($blog);send_header('Content-Type: text/css; charset=utf-8');echo $blog['custom_css'] ?: file_get_contents(dirname(__DIR__).'/public/assets/blog.css');return;
     }

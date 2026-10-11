@@ -40,11 +40,11 @@ function icon_link(string $path,string $key,string $shape): void {
     $shapes=['plus'=>'M8 2v12M2 8h12','pencil'=>'M3 10l7-7 3 3-7 7-4 1zM9 4l3 3','trash'=>'M3 4h10M6 4V2h4v2M4 4l1 10h6l1-10','settings'=>'M8 1v2M8 13v2M1 8h2M13 8h2M3 3l2 2M11 11l2 2M3 13l2-2M11 5l2-2'];
     echo '<a href="'.e($path).'" aria-label="'.e(t($key)).'" title="'.e(t($key)).'"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="'.e($shapes[$shape]).'"/>'.($shape==='settings'?'<circle cx="8" cy="8" r="3"/>':'').'</svg></a>';
 }
-function render_blog(array $blog,?array $section=null,?array $post=null,bool $preview=false): void {
+function render_blog(array $blog,?array $section=null,?array $post=null,bool $preview=false,bool $feed=false): void {
     headers_for($blog,$preview); $owner=is_owner($blog) && !$preview;
     echo '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e(($post['title'] ?? $section['title'] ?? $blog['title'])).'</title><link rel="stylesheet" href="/'.e($blog['username']).'/style.css"></head><body class="blog"><a class="skip" href="#main">'.e(t('skip')).'</a><header class="blog-header"><h1 class="blog-title"><a href="/'.e($blog['username']).'">'.e($blog['title']).'</a></h1>';
     if ($blog['description']!=='') echo '<p class="blog-description">'.e($blog['description']).'</p>';
-    echo '<nav class="blog-nav" aria-label="'.e(t('sections')).'">'.link_to('/'.$blog['username'],'home');
+    echo '<nav class="blog-nav" aria-label="'.e(t('sections')).'">'.link_to('/'.$blog['username'],'home').' '.link_to('/'.$blog['username'].'/blogs','blogs');
     foreach (section_list($blog['id']) as $item) echo '<a href="/'.e($blog['username']).'/'.e($item['slug']).'">'.e($item['title']).'</a>';
     echo '</nav></header>';
     if ($owner) { echo '<div class="blog-owner">';icon_link('/'.$blog['username'].'/new','new_post','plus');icon_link('/manage','settings','settings');echo '</div>'; }
@@ -53,9 +53,12 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
     if ($post) {
         echo '<article class="blog-post"><h2 class="blog-post-title">'.e($post['title']).'</h2><p><time class="blog-post-date" datetime="'.e($post['published_at'] ?? $post['created_at']).'">'.e(substr($post['published_at'] ?? $post['created_at'],0,10)).'</time>'.($post['status']==='draft'?e(t('draft')):'').'</p><div class="blog-post-body">'.markdown($post['body_markdown']).'</div></article>';
         if ($owner) { echo '<div class="blog-owner">';icon_link('/'.$blog['username'].'/edit/'.$post['id'],'edit','pencil');icon_link('/'.$blog['username'].'/delete/'.$post['id'],'delete','trash');echo '</div>'; }
+    } elseif (!$section && !$feed) {
+        echo '<article class="blog-section blog-home"><h2>'.e(t('home')).'</h2>'.markdown($blog['home_markdown']).'</article>';
+        if ($owner) { echo '<div class="blog-owner">';icon_link('/manage/sections/home','edit_home','pencil');echo '</div>'; }
     } else {
         if ($section) echo '<section class="blog-section"><h2>'.e($section['title']).'</h2>'.markdown($section['content_markdown']).'</section>';
-        else echo '<h2>'.e(t('recent')).'</h2>';
+        else echo '<h2>'.e(t('blogs')).'</h2>';
         $number=input('page',$_GET); if ($number!=='' && (!ctype_digit($number) || (int)$number<1 || (int)$number>10000)) fail(400,'invalid');
         $page=max(1,(int)$number); $sql='SELECT * FROM posts WHERE blog_id=? AND deleted_at IS NULL'; $params=[$blog['id']];
         if ($section) { $sql.=' AND section_id=?';$params[]=$section['id']; }
@@ -70,7 +73,7 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
                 if ($owner) { echo ' ';icon_link('/'.$blog['username'].'/edit/'.$item['id'],'edit','pencil');echo ' ';icon_link('/'.$blog['username'].'/delete/'.$item['id'],'delete','trash'); } echo '</li>';
             } echo '</ul>';
         }
-        $base='/'.$blog['username'].($section?'/'.$section['slug']:'').($preview?'/preview':'');
+        $base='/'.$blog['username'].($section?'/'.$section['slug']:'/blogs');
         echo '<nav aria-label="'.e(t('next')).'">';if ($page>1) echo link_to($base.'?page='.($page-1),'previous');if ($more) echo ' '.link_to($base.'?page='.($page+1),'next');echo '</nav>';
     }
     echo '</main><footer class="blog-footer">'.link_to('/','brand').'</footer></body></html>';
@@ -96,7 +99,7 @@ function confirmation(string $key,string $help,string $cancel,?array $management
 }
 function manage_sections(array $blog): void {
     page('sections',function () use ($blog) {
-        $sections=section_list($blog['id']);echo '<p>'.count($sections).' '.e(t('section_count')).'</p><ul class="section-list">';
+        $sections=section_list($blog['id']);echo '<ul class="section-list"><li>'.e(t('home')).'<div class="actions">'.link_to('/manage/sections/home','edit').'</div></li><li>'.link_to('/'.$blog['username'].'/blogs','blogs').'</li></ul><p>'.count($sections).' '.e(t('section_count')).'</p><ul class="section-list">';
         foreach ($sections as $i=>$section) {
             $path='/manage/sections/'.$section['id'];
             echo '<li>'.e($section['title']).'<div class="actions">'.link_to($path.'/edit','edit').' '.link_to($path.'/delete','delete');
@@ -121,5 +124,12 @@ function manage_settings(array $blog,?string $error=null): void {
 function delete_blog_form(array $blog,?string $error=null): void {
     page('delete_blog',function () {
         echo '<p>'.e(t('delete_blog_help')).'</p><form method="post">';token_field();field('password','password','','password');field('confirmation','type_username',value('confirmation'),'text');echo '<div class="actions">'.link_to('/manage/settings','cancel');button('delete_permanently');echo '</div></form>';
+    },$error,$blog);
+}
+
+function home_editor(array $blog,?string $error=null): void {
+    page('edit_home',function () use ($blog) {
+        echo '<form method="post">';token_field();area('content','content',value('content',$blog['home_markdown']));
+        echo '<div class="actions">';button('save');echo link_to('/'.$blog['username'],'cancel').'</div></form>';
     },$error,$blog);
 }

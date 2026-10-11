@@ -28,3 +28,5 @@ function config(): array {
 function reserved_names(): array {
     return ['admin','administrator','api','login','logout','register','manage','assets','static','style','style.css','health','robots.txt','posts','new','edit','delete','preview','favicon.ico','index.php','www','root','support','security','abuse','postmaster','webmaster','bin','src','config','storage','database','vendor','tests','.well-known'];
 }
+
+function section_reserved_names(): array { return array_merge(reserved_names(), ['inicio','blogs']); }

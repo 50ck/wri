@@ -7,7 +7,7 @@ function t(string $key): string {
         'password_help'=>'al menos 12 caracteres. no hay recuperación automática de cuentas.', 'username_help'=>'3–24 letras minúsculas, números o guiones. sin guiones seguidos ni en los extremos.',
         'home'=>'inicio', 'manage'=>'gestionar', 'sections'=>'secciones', 'appearance'=>'apariencia', 'settings'=>'ajustes', 'blog'=>'ver blog', 'new_post'=>'nueva entrada',
         'edit'=>'editar', 'delete'=>'eliminar', 'title'=>'título', 'description'=>'descripción breve', 'section'=>'sección', 'unsectioned'=>'sin sección', 'content'=>'contenido Markdown',
-        'save'=>'guardar', 'draft'=>'borrador', 'save_draft'=>'guardar borrador', 'publish'=>'publicar', 'empty'=>'todavía no hay entradas.', 'recent'=>'entradas recientes',
+        'save'=>'guardar', 'draft'=>'borrador', 'save_draft'=>'guardar borrador', 'publish'=>'publicar', 'empty'=>'todavía no hay entradas.', 'blogs'=>'blogs', 'edit_home'=>'editar inicio',
         'previous'=>'anterior', 'next'=>'siguiente', 'cancel'=>'cancelar', 'confirm'=>'confirmar', 'new_section'=>'nueva sección', 'intro_content'=>'introducción Markdown (opcional)',
         'up'=>'subir', 'down'=>'bajar', 'delete_post'=>'¿eliminar esta entrada?', 'delete_post_help'=>'la entrada dejará de estar disponible. se conserva en la base de datos hasta eliminar la cuenta.',
         'delete_section'=>'¿eliminar esta sección?', 'delete_section_help'=>'sus entradas se conservarán y pasarán a «sin sección». los enlaces anteriores redirigirán a su nueva dirección.',
