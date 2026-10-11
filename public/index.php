@@ -4,13 +4,12 @@ require dirname(__DIR__).'/app.php';
 function route_index(string $path): void {
     if ($path==='/') {
         methods(['GET']);
-        $error=null;
-        if (isset($_GET['username'])) { try { $name=username(input('username',$_GET));redirect('/register?username='.rawurlencode($name)); } catch(HttpError $e) { $error=$e->getMessage();http_response_code($e->status); } }
         page('brand',function () {
             echo '<p>'.e(t('intro')).'</p>';
-            if (config()['registration']) { echo '<form method="get" action="/">';field('username','username',input('username',$_GET),'text',true,24);echo '<div class="actions">';button('create_blog');echo '</div></form>'; }
-            echo '<p>'.e(t('have_account')).' '.link_to('/login','login').'</p>';
-        },$error);return;
+            echo '<p>'.link_to('/login','login');
+            if (config()['registration']) echo ' '.e(t('or')).' '.link_to('/register','sign_up');
+            echo '</p>';
+        });return;
     }
     if ($path==='/register') {
         methods(['GET','POST']);if (!config()['registration']) fail(403,'registration_closed');

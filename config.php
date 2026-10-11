@@ -38,7 +38,7 @@ function t(string $key): string {
     if ($key==='intro') return config()['site_description'];
     static $strings = [
         'username'=>'nombre de usuario', 'create_blog'=>'crear blog',
-        'have_account'=>'¿ya tienes cuenta?', 'login'=>'entrar', 'logout'=>'salir', 'register'=>'crear tu blog', 'password'=>'contraseña', 'confirm_password'=>'repetir contraseña',
+        'or'=>'o', 'sign_up'=>'registrarme', 'login'=>'entrar', 'logout'=>'salir', 'register'=>'crear tu blog', 'password'=>'contraseña', 'confirm_password'=>'repetir contraseña',
         'password_help'=>'min 12 caracteres', 'username_help'=>'min 3 letras',
         'home'=>'inicio', 'manage'=>'gestionar', 'sections'=>'secciones', 'appearance'=>'apariencia', 'settings'=>'ajustes', 'addons'=>'addons', 'addons_empty'=>'no hay addons instalados', 'blog'=>'ver blog', 'new_post'=>'nueva entrada',
         'edit'=>'editar', 'delete'=>'eliminar', 'title'=>'título', 'description'=>'descripción breve', 'section'=>'sección', 'unsectioned'=>'sin sección', 'content'=>'contenido Markdown',
