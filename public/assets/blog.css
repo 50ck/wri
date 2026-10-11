@@ -14,6 +14,7 @@
 .blog-footer { margin-top: 3rem; font-size: .85rem; }
 .blog pre { max-width: 100%; overflow-x: auto; overflow-wrap: normal; padding: 1rem; box-sizing: border-box; background: #242424; }
 .blog code { font-family: monospace; }
+.blog img { max-width: 100%; height: auto; }
 .blog pre, .blog-table { scrollbar-color: #777 #171717; }
 .blog-table { max-width: 100%; overflow-x: auto; margin: 1rem 0; }
 .blog table { width: 100%; border-collapse: collapse; overflow-wrap: normal; }

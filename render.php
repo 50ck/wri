@@ -45,7 +45,14 @@ function icon_link(string $path,string $key,string $shape): void {
     echo '<a href="'.e($path).'" aria-label="'.e(t($key)).'" title="'.e(t($key)).'"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="'.e($shapes[$shape]).'"/>'.($shape==='settings'?'<circle cx="8" cy="8" r="3"/>':'').'</svg></a>';
 }
 function render_blog(array $blog,?array $section=null,?array $post=null,bool $preview=false,bool $feed=false): void {
-    headers_for($blog,$preview); $owner=is_owner($blog) && !$preview;
+    $body=$post ? $post['body_markdown'] : ($section ? $section['content_markdown'] : ($feed ? '' : $blog['home_markdown']));
+    $html=markdown($body,$blog); $images=[];
+    if (str_contains($html,'<img')) {
+        $doc=new DOMDocument(); $previous=libxml_use_internal_errors(true);
+        $doc->loadHTML('<?xml encoding="UTF-8">'.$html,LIBXML_NONET); libxml_clear_errors(); libxml_use_internal_errors($previous);
+        foreach ($doc->getElementsByTagName('img') as $image) $images[]=$image->getAttribute('src');
+    }
+    headers_for($blog,$preview,images:$images); $owner=is_owner($blog) && !$preview;
     echo '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e(($post['title'] ?? $section['title'] ?? $blog['title'])).'</title><link rel="stylesheet" href="/'.e($blog['username']).'/style.css"></head><body class="blog"><a class="skip" href="#main">'.e(t('skip')).'</a><header class="blog-header"><h1 class="blog-title"><a href="/'.e($blog['username']).'">'.e($blog['title']).'</a></h1>';
     if ($blog['description']!=='') echo '<p class="blog-description">'.e($blog['description']).'</p>';
     echo '<nav class="blog-nav" aria-label="'.e(t('sections')).'">'.link_to('/'.$blog['username'],'home').' '.link_to('/'.$blog['username'].'/blogs','blogs');
@@ -55,15 +62,15 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
     echo '<main class="blog-main" id="main">';
     if ($owner && isset($_SESSION['flash'])) { echo '<p class="feedback" role="status">'.e(t($_SESSION['flash'])).'</p>'; unset($_SESSION['flash']); }
     if ($post) {
-        echo '<article class="blog-post"><h2 class="blog-post-title">'.e($post['title']).'</h2><p><time class="blog-post-date" datetime="'.e($post['published_at'] ?? $post['created_at']).'">'.e(substr($post['published_at'] ?? $post['created_at'],0,10)).'</time>'.($post['status']==='draft'?e(t('draft')):'').'</p><div class="blog-post-body">'.markdown($post['body_markdown'],$blog).'</div></article>';
+        echo '<article class="blog-post"><h2 class="blog-post-title">'.e($post['title']).'</h2><p><time class="blog-post-date" datetime="'.e($post['published_at'] ?? $post['created_at']).'">'.e(substr($post['published_at'] ?? $post['created_at'],0,10)).'</time>'.($post['status']==='draft'?e(t('draft')):'').'</p><div class="blog-post-body">'.$html.'</div></article>';
         addon_slot('post_after',$blog,$post);
         if ($owner) { echo '<div class="blog-owner">';icon_link('/'.$blog['username'].'/edit/'.$post['id'],'edit','pencil');icon_link('/'.$blog['username'].'/delete/'.$post['id'],'delete','trash');echo '</div>'; }
     } elseif (!$section && !$feed) {
         echo '<article class="blog-section blog-home"><h2>'.e(t('home'));
         if ($owner) { echo ' ';icon_link('/manage/sections/home','edit_home','pencil'); }
-        echo '</h2>'.markdown($blog['home_markdown'],$blog).'</article>';
+        echo '</h2>'.$html.'</article>';
     } else {
-        if ($section) echo '<section class="blog-section"><h2>'.e($section['title']).'</h2>'.markdown($section['content_markdown'],$blog).'</section>';
+        if ($section) echo '<section class="blog-section"><h2>'.e($section['title']).'</h2>'.$html.'</section>';
         else {
             echo '<h2>'.e(t('blogs'));
             if ($owner) { echo ' ';icon_link('/'.$blog['username'].'/new','new_post','plus'); }

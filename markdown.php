@@ -1,22 +1,38 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__.'/libraries/parsedown/Parsedown.php';
+function markdown_image_url(string $url): ?string {
+    if (strlen($url)>512 || preg_match('/[\x00-\x20\x7f\\\\;<>"\']/', $url) || !filter_var($url,FILTER_VALIDATE_URL)) return null;
+    $parts=parse_url($url); $host=strtolower($parts['host'] ?? '');
+    if (($parts['scheme'] ?? '')!=='https' || isset($parts['user']) || isset($parts['pass']) || (isset($parts['port']) && $parts['port']!==443)) return null;
+    if (!preg_match('/\A[a-z0-9.-]+\z/',$host) || !str_contains($host,'.') || str_ends_with($host,'.') || filter_var($host,FILTER_VALIDATE_IP) || $host===strtolower(parse_url(config()['base_url'],PHP_URL_HOST))) return null;
+    foreach (['localhost','local','internal','test','invalid'] as $suffix) if ($host===$suffix || str_ends_with($host,'.'.$suffix)) return null;
+    $path=$parts['path'] ?? '';
+    if ($path==='' || str_ends_with($path,'/')) return null;
+    return $url;
+}
 function markdown(string $body,?array $blog=null): string {
     $active=active_addons($blog);
     $parser=new AddonMarkdown();
     foreach ($active as $addon) if (isset($addon['parser'])) ($addon['parser'])($parser);
     $html = $parser->setSafeMode(true)->setMarkupEscaped(true)->setUrlsLinked(false)->text($body);
-    // Defense in depth: no embeds, resource-loading elements or active attributes.
+    // Defense in depth: no embeds or active attributes; images use validated HTTPS URLs.
     $doc = new DOMDocument();
     $previous=libxml_use_internal_errors(true);
     $doc->loadHTML('<?xml encoding="UTF-8"><div id="markdown-root">'.$html.'</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD | LIBXML_NONET);
     libxml_clear_errors(); libxml_use_internal_errors($previous);
     $allowed=['p','h1','h2','h3','h4','h5','h6','em','strong','a','ul','ol','li','blockquote','pre','code','hr','br','del','table','thead','tbody','tr','th','td'];
-    $headings=[]; $tables=[]; $quotes=[];
+    $headings=[]; $tables=[]; $quotes=[]; $images=0; $imageBytes=0;
     foreach (iterator_to_array($doc->getElementsByTagName('*')) as $node) {
         if ($node->getAttribute('id')==='markdown-root') continue;
         if ($node->nodeName==='img') {
-            $node->parentNode?->replaceChild($doc->createTextNode($node->getAttribute('alt')), $node);
+            $url=markdown_image_url($node->getAttribute('src')); $alt=$node->getAttribute('alt'); $title=$node->getAttribute('title');
+            if (!$url || ++$images>16 || ($imageBytes+=strlen($url))>2048) {
+                $node->parentNode?->replaceChild($doc->createTextNode($alt),$node); continue;
+            }
+            foreach (iterator_to_array($node->attributes) as $attr) $node->removeAttribute($attr->name);
+            foreach (['src'=>$url,'alt'=>$alt,'referrerpolicy'=>'no-referrer','loading'=>'lazy','decoding'=>'async'] as $name=>$value) $node->setAttribute($name,$value);
+            if ($title!=='') $node->setAttribute('title',$title);
             continue;
         }
         if (!in_array($node->nodeName,$allowed,true)) { $node->parentNode?->removeChild($node); continue; }
