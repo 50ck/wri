@@ -10,7 +10,9 @@ function field(string $name,string $key,string $value='',string $type='text',boo
     echo '>';
 }
 function area(string $name,string $key,string $value='',bool $css=false): void {
-    echo '<label for="'.e($name).'">'.e(t($key)).'</label><textarea id="'.e($name).'" name="'.e($name).'"'.($css?' class="css-editor" spellcheck="false"':'').'>'.e($value).'</textarea>';
+    if ($css) echo '<label for="'.e($name).'">'.e(t($key)).'</label>';
+    echo '<textarea id="'.e($name).'" name="'.e($name).'"'.($css?' class="css-editor" spellcheck="false"':' aria-label="'.e(t($key)).'" aria-describedby="'.e($name).'-help"').'>'.e($value).'</textarea>';
+    if (!$css) echo '<small id="'.e($name).'-help">'.e(t('markdown_help')).'</small>';
 }
 function button(string $key,?string $name=null,?string $value=null): void { echo '<button type="submit"'.($name?' name="'.e($name).'" value="'.e($value).'"':'').'>'.e(t($key)).'</button>'; }
 function page(string $key,callable $content,?string $error=null,?array $management=null,?string $addon=null): void {
