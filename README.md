@@ -1,4 +1,4 @@
-# type
+# wri
 
 A small multi-user blog engine: PHP 8.4/8.5, PDO SQLite, native forms and CSS. All interface text is English. No JavaScript, framework, build process, uploads or external runtime services.
 
@@ -56,7 +56,7 @@ Environment variables or a private PHP file specified by `BLOG_CONFIG` configure
 
 | Environment | Private key | Default |
 | --- | --- | --- |
-| `BLOG_SITE_NAME` | `site_name` | `type` |
+| `BLOG_SITE_NAME` | `site_name` | `wri` |
 | `BLOG_SITE_DESCRIPTION` | `site_description` | `a little place to write on the internet` |
 | `BLOG_BASE_URL` | `base_url` | `http://localhost:8080` |
 | `BLOG_DATABASE` | `database` | `storage/blog.sqlite` |
