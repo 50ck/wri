@@ -86,7 +86,7 @@ try {
     foreach(['<h1','<strong>','<em>','<code>','<ul>','<blockquote>','<hr','<pre>'] as $tag)check(str_contains($html,$tag),'Markdown '.$tag);
     check(!str_contains($html,'<script')&&!str_contains($html,'<img')&&!str_contains($html,'href="javascript:'),'Markdown sanitization');
     $stress=markdown(file_get_contents(__DIR__.'/fixtures/markdown-stress.md'));
-    $document=new DOMDocument();$document->loadHTML('<?xml encoding="UTF-8"><main id="main">'.$stress.'</main>');
+    $document=new DOMDocument();$document->loadHTML('<?xml encoding="UTF-8"><div id="main">'.$stress.'</div>');
     $xpath=new DOMXPath($document);
     foreach (['introducción','después-del-código','repetido','repetido-1','repetido-1-1','main-1'] as $id) check((bool)$document->getElementById($id),'Unique heading anchor '.$id);
     foreach ($xpath->query('//a[starts-with(@href,"#")]') as $anchor) check((bool)$document->getElementById(rawurldecode(substr($anchor->getAttribute('href'),1))),'Fragment link resolves');
