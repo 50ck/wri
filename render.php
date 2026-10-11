@@ -204,8 +204,7 @@ function admin_user_editor(array $blog,array $user,?string $error=null): void {
 }
 function admin_user_delete(array $blog,array $user,?string $error=null): void {
     page('delete_user',function () use($user) {
-        echo '<p>'.e($user['username']).'</p><form method="post">';token_field();
-        field('password','your_password','','password');field('confirmation','type_username');
-        echo '<div class="actions">'.link_to('/manage/admin','cancel');button('delete_permanently');echo '</div></form>';
+        echo '<form method="post">';token_field();
+        echo '<div class="actions">'.link_to('/manage/admin','cancel').'<button type="submit">'.e(str_replace('{username}',$user['username'],t('delete_user_button'))).'</button></div></form>';
     },$error,$blog);
 }

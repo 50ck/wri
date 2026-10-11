@@ -29,7 +29,7 @@ function route_manage(string $path): void {
                 });admin_user_editor($blog,$user,$error);return;
             }
             $error=submitted(function () use($user) {
-                admin_delete_user($user['id'],input('password'),input('confirmation'));
+                admin_delete_user($user['id']);
                 redirect('/manage/admin',303,'deleted');
             });admin_user_delete($blog,$user,$error);return;
         }

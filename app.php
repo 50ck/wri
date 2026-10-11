@@ -118,13 +118,12 @@ function admin_edit_user(int $id,string $name,string $password,string $confirm,s
         query('UPDATE blogs SET visibility=?,updated_at=? WHERE user_id=?',[$visibility,now(),$id]);
     });
 }
-function admin_delete_user(int $id,string $password,string $confirmation): void {
+function admin_delete_user(int $id): void {
     require_admin();$admin=require_user();
     rate_limit('admin-delete',(string)$admin['id'],10,900);
-    transaction(static function () use($id,$password,$confirmation,$admin) {
-        $user=admin_user($id);
+    transaction(static function () use($id) {
+        admin_user($id);
         if ($id===(int)platform_settings()['admin_user_id']) fail(403,'forbidden');
-        if (!password_check($password,$admin['password_hash']) || !hash_equals($user['username'],$confirmation)) fail(422,'delete_error');
         query('DELETE FROM users WHERE id=?',[$id]);
     });
 }
