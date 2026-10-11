@@ -44,3 +44,11 @@
 .blog .hljs-deletion { color: #eda7a7; }
 .blog .hljs-emphasis { font-style: italic; }
 .blog .hljs-strong { font-weight: bold; }
+
+.blog-diagram { max-width: 100%; overflow-x: auto; margin: 1rem 0; scrollbar-color: #777 #171717; }
+.blog .mermaid-diagram { display: block; width: auto; height: auto; max-width: none; font: 14px system-ui, sans-serif; }
+.blog .mermaid-node { fill: #242424; stroke: #9fc3e8; }
+.blog .mermaid-edge { fill: none; stroke: #b5b5b5; }
+.blog .mermaid-arrow { fill: #b5b5b5; stroke: none; }
+.blog .mermaid-label-background { fill: #171717; stroke: none; }
+.blog .mermaid-label { fill: #ededed; stroke: none; text-anchor: middle; }

@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once dirname(__DIR__) . '/vendor/parsedown/Parsedown.php';
+require_once __DIR__.'/mermaid.php';
 function markdown(string $body): string {
     $parser = new Parsedown();
     $html = $parser->setSafeMode(true)->setMarkupEscaped(true)->setUrlsLinked(false)->text($body);
@@ -51,8 +52,24 @@ function markdown(string $body): string {
         $quote->insertBefore($title,$quote->firstChild);
     }
     // Explicit languages only; oversized blocks stay escaped plain text.
-    $budget=65536;
+    $budget=65536; $diagramCount=0;
     foreach ($blocks as [$code,$language]) {
+        if ($language==='mermaid') {
+            $svg=$diagramCount++<8 ? mermaid_svg($code->textContent) : null;
+            if ($svg!==null) {
+                $fragment=$doc->createDocumentFragment();
+                if ($fragment->appendXML($svg)) {
+                    $wrapper=$doc->createElement('div'); $wrapper->setAttribute('class','blog-diagram');
+                    $wrapper->setAttribute('tabindex','0'); $wrapper->setAttribute('role','region');
+                    $wrapper->setAttribute('aria-label',t('flowchart')); $wrapper->appendChild($fragment);
+                    $pre=$code->parentNode; $pre->parentNode->replaceChild($wrapper,$pre);
+                }
+            } else {
+                $notice=$doc->createElement('p'); $notice->appendChild($doc->createTextNode(t('diagram_unsupported')));
+                $code->parentNode->parentNode->insertBefore($notice,$code->parentNode);
+            }
+            continue;
+        }
         $size=strlen($code->textContent);
         if ($size>16384 || $size>$budget) continue;
         $budget-=$size;

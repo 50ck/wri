@@ -22,7 +22,7 @@ function t(string $key): string {
         'forbidden'=>'no tienes permiso.', 'rate_error'=>'demasiados intentos. inténtalo más tarde.', 'too_large'=>'el contenido supera el tamaño permitido.', 'section_limit'=>'puedes tener como máximo diez secciones.',
         'post_limit'=>'has alcanzado el límite de entradas.', 'delete_error'=>'la contraseña o el nombre de confirmación no son correctos.', 'registration_closed'=>'el registro está cerrado.',
         'method_error'=>'método no permitido.', 'server_error'=>'no se pudo completar la solicitud.', 'error'=>'error', 'skip'=>'ir al contenido', 'edit_post'=>'editar entrada',
-        'edit_section'=>'editar sección', 'section_count'=>'de 10', 'table'=>'tabla', 'alert_note'=>'nota', 'alert_tip'=>'consejo', 'alert_warning'=>'aviso', 'date'=>'fecha', 'status'=>'estado', 'privacy_help'=>'un blog privado solo puede leerse desde tu cuenta.',
+        'edit_section'=>'editar sección', 'section_count'=>'de 10', 'table'=>'tabla', 'flowchart'=>'diagrama de flujo', 'diagram_unsupported'=>'no se pudo dibujar este diagrama; se muestra su código.', 'alert_note'=>'nota', 'alert_tip'=>'consejo', 'alert_warning'=>'aviso', 'date'=>'fecha', 'status'=>'estado', 'privacy_help'=>'un blog privado solo puede leerse desde tu cuenta.',
     ];
     return $strings[$key] ?? throw new LogicException('Missing translation: '.$key);
 }
