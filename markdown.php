@@ -4,8 +4,8 @@ require_once __DIR__.'/libraries/parsedown/Parsedown.php';
 function markdown_image_url(string $url): ?string {
     if (strlen($url)>512 || preg_match('/[\x00-\x20\x7f\\\\;<>"\']/', $url) || !filter_var($url,FILTER_VALIDATE_URL)) return null;
     $parts=parse_url($url); $host=strtolower($parts['host'] ?? '');
-    if (($parts['scheme'] ?? '')!=='https' || isset($parts['user']) || isset($parts['pass']) || (isset($parts['port']) && $parts['port']!==443)) return null;
-    if (!preg_match('/\A[a-z0-9.-]+\z/',$host) || !str_contains($host,'.') || str_ends_with($host,'.') || filter_var($host,FILTER_VALIDATE_IP) || $host===strtolower(parse_url(config()['base_url'],PHP_URL_HOST))) return null;
+    if (strtolower($parts['scheme'] ?? '')!=='https' || isset($parts['user']) || isset($parts['pass']) || (isset($parts['port']) && $parts['port']!==443)) return null;
+    if (!preg_match('/\A(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z][a-z0-9-]*[a-z0-9]\z/',$host) || $host===strtolower(parse_url(config()['base_url'],PHP_URL_HOST))) return null;
     foreach (['localhost','local','internal','test','invalid'] as $suffix) if ($host===$suffix || str_ends_with($host,'.'.$suffix)) return null;
     $path=$parts['path'] ?? '';
     if ($path==='' || str_ends_with($path,'/')) return null;
