@@ -9,6 +9,8 @@ $checks=0;
 function check(bool $ok,string $label): void { global $checks;if (!$ok) throw new RuntimeException($label);$checks++; }
 function rejects(callable $fn,int $status): void { try {$fn();}catch(HttpError $e){check($e->status===$status,'Unexpected rejection');return;}throw new RuntimeException('Expected rejection'); }
 try {
+    check(!array_filter(get_included_files(),fn($file)=>str_contains($file,'/extensions/') && str_ends_with($file,'/render.php')),'Addon libraries are not loaded during bootstrap');
+    check(!str_contains(markdown('$x^2$'),'<math '),'Markdown without a blog never enables addons');
     // Upgrade a real v1 database, including conflicting section paths.
     db()->exec(initial_schema());
     db()->exec('CREATE TABLE migrations (version TEXT PRIMARY KEY, applied_at TEXT NOT NULL)');
@@ -22,6 +24,7 @@ try {
     query('INSERT INTO posts(blog_id,section_id,title,slug,body_markdown,status,created_at,updated_at,published_at) VALUES (?,?,?,?,?,?,?,?,?)',[$legacyBlog,$legacySection,'Existing post','existing','preserved post','published',now(),now(),now()]);
     $legacyPost=(int)db()->lastInsertId();
     migrate();migrate();
+    check(count(active_addons(['id'=>$legacyBlog]))===3,'Upgrade activates shipped addons for existing blog');
     check(one('SELECT home_markdown FROM blogs WHERE id=?',[$legacyBlog])['home_markdown']==='','Migration initializes singleton homepage');
     check(one('SELECT slug FROM sections WHERE id=?',[$legacySection])['slug']==='blogs-3','Migration resolves section collision');
     check((bool)one('SELECT id FROM sections WHERE blog_id=? AND slug=?',[$legacyBlog,'inicio-2']),'Migration reserves inicio');
