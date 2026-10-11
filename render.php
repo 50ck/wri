@@ -118,10 +118,10 @@ function confirmation(string $key,string $help,string $cancel,?array $management
 }
 function manage_sections(array $blog): void {
     page('sections',function () use ($blog) {
-        $sections=section_list($blog['id']);echo '<p>'.count($sections).' '.e(t('section_count')).'</p><ul class="section-list"><li>'.link_to('/'.$blog['username'],'home').' <span class="section-edit">'.link_to('/manage/sections/home','edit').'</span></li><li>'.link_to('/'.$blog['username'].'/blogs','blogs').'</li>';
+        $sections=section_list($blog['id']);echo '<ul class="section-list"><li>'.link_to('/'.$blog['username'],'home').' <span class="section-actions">'.link_to('/manage/sections/home','edit').'</span></li><li>'.link_to('/'.$blog['username'].'/blogs','blogs').'</li>';
         foreach ($sections as $i=>$section) {
             $path='/manage/sections/'.$section['id'];
-            echo '<li><a href="/'.e($blog['username']).'/'.e($section['slug']).'">'.e($section['title']).'</a> <span class="section-edit">'.link_to($path.'/edit','edit').'</span> '.link_to($path.'/delete','delete');
+            echo '<li><a href="/'.e($blog['username']).'/'.e($section['slug']).'">'.e($section['title']).'</a> <span class="section-actions">'.link_to($path.'/edit','edit').' '.link_to($path.'/delete','delete').'</span>';
             echo ' <form class="inline" method="post" action="'.$path.'/reorder">';token_field();
             if ($i>0) button('up','direction','up');if ($i<count($sections)-1) button('down','direction','down');echo '</form></li>';
         } echo '</ul>';if (count($sections)<10) echo link_to('/manage/sections/new','new_section');
