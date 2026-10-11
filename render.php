@@ -168,18 +168,40 @@ function manage_admin(array $blog,?string $error=null): void {
         $number=input('page',$_GET);
         if ($number!=='' && (!ctype_digit($number) || (int)$number<1 || (int)$number>10000)) fail(400,'invalid');
         $page=max(1,(int)$number);
-        $users=query('SELECT u.username,b.id,b.visibility FROM users u JOIN blogs b ON b.user_id=u.id ORDER BY u.id LIMIT 51 OFFSET ?',[($page-1)*50])->fetchAll();
+        $users=query('SELECT u.id AS user_id,u.username,b.id,b.visibility FROM users u JOIN blogs b ON b.user_id=u.id ORDER BY u.id LIMIT 51 OFFSET ?',[($page-1)*50])->fetchAll();
         $more=count($users)>50;echo '<ul class="section-list">';
         foreach (array_slice($users,0,50) as $user) {
             echo '<li><a href="/'.e($user['username']).'">'.e($user['username']).'</a>';
+            echo ' <span class="section-actions">';
+            icon_link('/manage/admin/users/'.$user['user_id'].'/edit','edit','pencil');echo ' ';
+            icon_link('/manage/admin/users/'.$user['user_id'].'/delete','delete','trash');
             if ($user['visibility']==='public' && (int)$user['id']!==(int)$home) {
-                echo ' <span class="section-actions">'.link_to('/manage/admin/homepage?blog_id='.$user['id'],'use_blog_home').'</span>';
-            } elseif ($user['visibility']==='private') echo ' <span class="section-actions">'.e(t('private')).'</span>';
-            echo '</li>';
+                echo ' '.link_to('/manage/admin/homepage?blog_id='.$user['id'],'use_blog_home');
+            } elseif ($user['visibility']==='private') echo ' '.e(t('private'));
+            echo '</span></li>';
         }
         echo '</ul><nav>';
         if ($page>1) echo link_to('/manage/admin?page='.($page-1),'previous');
         if ($more) echo link_to('/manage/admin?page='.($page+1),'next');
         echo '</nav>';
+    },$error,$blog);
+}
+
+function admin_user_editor(array $blog,array $user,?string $error=null): void {
+    page('edit_user',function () use($user) {
+        echo '<form method="post">';token_field();
+        field('username','username',value('username',$user['username']),'text',true,24);
+        field('new_password','new_password','','password',false);
+        field('confirm_password','confirm_password','','password',false);
+        echo '<small>'.e(t('password_unchanged')).'</small><label for="visibility">'.e(t('visibility')).'</label><select name="visibility" id="visibility">';
+        foreach (['public','private'] as $state) echo '<option value="'.$state.'"'.(value('visibility',$user['visibility'])===$state?' selected':'').'>'.e(t($state)).'</option>';
+        echo '</select><div class="actions">';button('save');echo link_to('/manage/admin','cancel').'</div></form>';
+    },$error,$blog);
+}
+function admin_user_delete(array $blog,array $user,?string $error=null): void {
+    page('delete_user',function () use($user) {
+        echo '<p>'.e($user['username']).'</p><p>'.e(t('delete_blog_help')).'</p><form method="post">';token_field();
+        field('password','your_password','','password');field('confirmation','type_username');
+        echo '<div class="actions">'.link_to('/manage/admin','cancel');button('delete_permanently');echo '</div></form>';
     },$error,$blog);
 }

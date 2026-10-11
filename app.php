@@ -82,7 +82,8 @@ function start_session(): void {
     if (isset($_SESSION['issued']) && time() - $_SESSION['issued'] > $c['session_lifetime']) { $_SESSION = []; session_regenerate_id(true); }
 }
 function current_user(): ?array {
-    return isset($_SESSION['user_id']) ? one('SELECT * FROM users WHERE id=?', [$_SESSION['user_id']]) : null;
+    $user=isset($_SESSION['user_id']) ? one('SELECT * FROM users WHERE id=?', [$_SESSION['user_id']]) : null;
+    return $user && (int)$user['auth_version']===(int)($_SESSION['auth_version']??0) ? $user : null;
 }
 function require_user(): array { return current_user() ?? throw new HttpError(401, t('login_required')); }
 function platform_settings(): array { return one('SELECT * FROM platform WHERE id=1') ?? throw new RuntimeException('Run install.php'); }
@@ -95,7 +96,36 @@ function save_platform_home(string $id): void {
         query('UPDATE platform SET homepage_blog_id=? WHERE id=1',[$id===''?null:(int)$id]);
     });
 }
-function authenticate(int $id): void { session_regenerate_id(true); $_SESSION = ['user_id'=>$id,'issued'=>time(),'csrf'=>bin2hex(random_bytes(32))]; }
+function authenticate(int $id): void { session_regenerate_id(true); $_SESSION = ['user_id'=>$id,'auth_version'=>(int)one('SELECT auth_version FROM users WHERE id=?',[$id])['auth_version'],'issued'=>time(),'csrf'=>bin2hex(random_bytes(32))]; }
+function admin_user(int $id): array {
+    require_admin();
+    return one('SELECT u.*,b.id AS blog_id,b.visibility FROM users u JOIN blogs b ON b.user_id=u.id WHERE u.id=?',[$id]) ?? throw new HttpError(404,t('not_found'));
+}
+function admin_edit_user(int $id,string $name,string $password,string $confirm,string $visibility): void {
+    require_admin();$name=username($name);
+    if (!in_array($visibility,['public','private'],true)) fail(422,'invalid');
+    $hash=null;
+    if ($password!=='' || $confirm!=='') { validate_password($password,$confirm);$hash=password_make($password); }
+    transaction(static function () use($id,$name,$hash,$visibility) {
+        $user=admin_user($id);
+        if (one('SELECT id FROM users WHERE username=? AND id<>?',[$name,$id]) || one('SELECT user_id FROM username_aliases WHERE username=? AND user_id<>?',[$name,$id])) fail(422,'username_taken');
+        if ($name!==$user['username']) {
+            query('DELETE FROM username_aliases WHERE username=? AND user_id=?',[$name,$id]);
+            query('INSERT INTO username_aliases(username,user_id) VALUES (?,?)',[$user['username'],$id]);
+        }
+        query('UPDATE users SET username=?,password_hash=?,auth_version=auth_version+?,updated_at=? WHERE id=?',[$name,$hash??$user['password_hash'],$hash===null?0:1,now(),$id]);
+        query('UPDATE blogs SET visibility=?,updated_at=? WHERE user_id=?',[$visibility,now(),$id]);
+    });
+}
+function admin_delete_user(int $id,string $password,string $confirmation): void {
+    require_admin();$admin=require_user();
+    rate_limit('admin-delete',(string)$admin['id'],10,900);
+    transaction(static function () use($id,$password,$confirmation,$admin) {
+        $user=admin_user($id);
+        if (!password_check($password,$admin['password_hash']) || !hash_equals($user['username'],$confirmation)) fail(422,'delete_error');
+        query('DELETE FROM users WHERE id=?',[$id]);
+    });
+}
 function logout(): void {
     $_SESSION=[]; session_destroy();
     $p=session_get_cookie_params(); setcookie(session_name(), '', ['expires'=>1,'path'=>'/','secure'=>$p['secure'],'httponly'=>true,'samesite'=>'Lax']);
@@ -138,6 +168,7 @@ function register_account(string $name, string $password, string $confirm): arra
     $name=username($name); validate_password($password,$confirm); $hash=password_make($password);
     try {
         return transaction(function () use ($name,$hash) {
+            if (one('SELECT user_id FROM username_aliases WHERE username=?',[$name])) fail(422,'username_taken');
             $time=now();
             query('INSERT INTO users(username,password_hash,created_at,updated_at) VALUES (?,?,?,?)',[$name,$hash,$time,$time]);
             $id=(int)db()->lastInsertId();

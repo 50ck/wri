@@ -30,6 +30,10 @@ function migrate(): void {
             $first=one('SELECT id FROM users ORDER BY id LIMIT 1');
             query('INSERT INTO platform(id,admin_user_id,admin_initialized) VALUES (1,?,?)',[$first['id']??null,$first?1:0]);
         },
+        '005_user_edit' => static function () {
+            db()->exec('ALTER TABLE users ADD COLUMN auth_version INTEGER NOT NULL DEFAULT 0');
+            db()->exec('CREATE TABLE username_aliases (username TEXT PRIMARY KEY COLLATE NOCASE, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE)');
+        },
     ];
     foreach ($migrations as $version => $apply) transaction(static function () use ($version,$apply) {
         if (!one('SELECT version FROM migrations WHERE version=?',[$version])) {

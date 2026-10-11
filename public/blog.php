@@ -4,6 +4,10 @@ function route_blog(string $path): void {
     $parts=explode('/',trim($path,'/'));$name=$parts[0];
     if (in_array($name,reserved_names(),true)) fail(404,'not_found');
     $blog=one('SELECT b.*,u.username FROM blogs b JOIN users u ON u.id=b.user_id WHERE u.username=?',[$name]);
+    if (!$blog) {
+        $alias=one('SELECT b.*,u.username FROM username_aliases a JOIN users u ON u.id=a.user_id JOIN blogs b ON b.user_id=u.id WHERE a.username=?',[$name]);
+        if ($alias) { can_read($alias);methods(['GET']);redirect('/'.$alias['username'].(count($parts)>1?'/'.implode('/',array_slice($parts,1)):''),308); }
+    }
     if (!$blog) fail(404,'not_found');
     $tail=array_slice($parts,1);
     if (($tail[0]??'')==='new' || in_array($tail[0]??'',['edit','delete'],true)) {

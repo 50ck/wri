@@ -4,6 +4,21 @@ function route_manage(string $path): void {
     if ($path==='/manage' || str_starts_with($path,'/manage/')) {
         $blog=owned_blog();
         if ($path==='/manage') { methods(['GET']);redirect('/manage/settings'); }
+        if (preg_match('~\A/manage/admin/users/([1-9][0-9]*)/(edit|delete)\z~',$path,$m)) {
+            require_admin();methods(['GET','POST']);$user=admin_user((int)$m[1]);$self=$user['id']===$blog['user_id'];
+            if ($m[2]==='edit') {
+                $error=submitted(function () use($user,$self) {
+                    admin_edit_user($user['id'],input('username'),input('new_password'),input('confirm_password'),input('visibility'));
+                    if ($self && input('new_password')!=='') authenticate($user['id']);
+                    redirect('/manage/admin',303,'saved');
+                });admin_user_editor($blog,$user,$error);return;
+            }
+            $error=submitted(function () use($user,$self) {
+                admin_delete_user($user['id'],input('password'),input('confirmation'));
+                if ($self) {logout();redirect('/');}
+                redirect('/manage/admin',303,'deleted');
+            });admin_user_delete($blog,$user,$error);return;
+        }
         if ($path==='/manage/admin/homepage') {
             require_admin();methods(['GET']);$id=input('blog_id',$_GET);
             if ($id!=='' && (!ctype_digit($id) || !one("SELECT id FROM blogs WHERE id=? AND visibility='public'",[$id]))) fail(422,'invalid');
