@@ -96,10 +96,29 @@ try {
     check($xpath->query('//div[@class="blog-table" and @tabindex="0" and @role="region"]')->length===1,'Keyboard accessible scroll region');
     check($xpath->query('//ol[@start="7"]')->length===1,'Ordered list start preserved');
     check(str_contains($stress,'<code>const marca = `dummy`;</code>'),'Code span containing backticks');
-    check(str_contains($stress,"un bloque dentro de otro\n```</code>") && $document->getElementById('después-del-código')->tagName==='h2','Four-backtick fence contains three-backtick fence');
+    check(str_contains($document->getElementsByTagName('pre')->item(0)->textContent,"un bloque dentro de otro\n```") && $document->getElementById('después-del-código')->tagName==='h2','Four-backtick fence contains three-backtick fence');
     check(str_contains($stress,'Texto alternativo preservado') && $document->getElementsByTagName('img')->length===0,'Image alternative text without resource loading');
     check($xpath->query('//a[@title="texto de ayuda"]')->length===1,'Safe link title preserved');
     check($xpath->query('//*[@style or @onclick or @onerror]')->length===0 && $document->getElementsByTagName('script')->length===0,'Extended Markdown remains inert');
+    $alerts=markdown("> [!NOTE]\n> contenido **fuerte**\n\n> [!TIP]\n> consejo con [enlace](https://example.com)\n\n> [!WARNING]\n> <script>inert</script>\n\n> [!OTHER]\n> texto normal\n\n`[!NOTE]`\n\n```text\n[!TIP]\n```");
+    foreach (['note'=>'nota','tip'=>'consejo','warning'=>'aviso'] as $kind=>$label) check(str_contains($alerts,'class="markdown-alert markdown-alert-'.$kind.'"') && str_contains($alerts,'class="markdown-alert-title">'.$label.'</p>'),'Markdown alert '.$kind);
+    check(str_contains($alerts,'<strong>fuerte</strong>') && str_contains($alerts,'href="https://example.com"'),'Alerts retain inline formatting');
+    check(str_contains($alerts,'[!OTHER]') && str_contains($alerts,'<code>[!NOTE]</code>') && str_contains($alerts,'<code>[!TIP]</code>'),'Unknown markers and code stay literal');
+    check(!str_contains($alerts,'<script>') && str_contains($alerts,'&lt;script&gt;'),'Alerts escape HTML');
+    foreach (['js'=>'const pato = "hola";', 'json'=>'{"pato": 42}', 'diff'=>"+nuevo\n-viejo", 'php'=>'<?php echo "hola";', 'html'=>'<div title="hola">texto</div>', 'python'=>'print("hola")', 'css'=>'body { color: red; }', 'sql'=>'SELECT 42;', 'sh'=>'echo "hola"', 'yaml'=>'pato: true', 'ini'=>'[blog]\ntitle=hola', 'ts'=>'const pato: string = "hola";', 'md'=>'# título'] as $language=>$source) {
+        $rendered=markdown("```".$language."\n".$source."\n```");
+        $codeDoc=new DOMDocument();$codeDoc->loadHTML('<?xml encoding="UTF-8">'.$rendered);
+        check(str_contains($rendered,'class="hljs-') && $codeDoc->getElementsByTagName('code')->item(0)->textContent===$source,'Server highlighting preserves '.$language);
+    }
+    $payload='</code><script>alert(1)</script><img src=x onerror=alert(1)> & "字"';
+    $safe=markdown("```js\n".$payload."\n```");
+    $safeDoc=new DOMDocument();$safeDoc->loadHTML('<?xml encoding="UTF-8">'.$safe);
+    check($safeDoc->getElementsByTagName('code')->item(0)->textContent===$payload && !$safeDoc->getElementsByTagName('script')->length && !$safeDoc->getElementsByTagName('img')->length,'Highlighting cannot inject HTML');
+    check(markdown("```unknown\n<script>\n```")==='<pre><code>&lt;script&gt;</code></pre>','Unknown languages remain escaped');
+    $large=str_repeat('const pato = "hola"; ',1000);
+    check(!str_contains(markdown("```js\n".$large."\n```"),'hljs-'),'Oversized code skips highlighting');
+    $bounded=markdown(str_repeat("```js\n".str_repeat('const pato = "hola"; ',500)."\n```\n\n",8));
+    check(substr_count($bounded,'<pre><code>const pato')===2,'Per-document highlighting budget');
     check(e('<"&')==='&lt;&quot;&amp;','HTML escaping');
     delete_post($blog,$post);rejects(fn()=>owned_post($blog,$post),404);
     rejects(fn()=>delete_account($blog,'wrong','alice'),422);
