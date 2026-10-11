@@ -2,7 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__.'/vendor/parsedown/Parsedown.php';
 function markdown(string $body,?array $blog=null): string {
-    $active=$blog===null ? addons() : active_addons($blog);
+    $active=$blog===null ? [] : active_addons($blog);
     $parser=new AddonMarkdown();
     foreach ($active as $addon) if (isset($addon['parser'])) ($addon['parser'])($parser);
     $html = $parser->setSafeMode(true)->setMarkupEscaped(true)->setUrlsLinked(false)->text($body);

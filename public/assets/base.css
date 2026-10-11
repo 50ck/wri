@@ -8,7 +8,7 @@ p { margin: 1rem 0; }
 nav, .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin: 1.5rem 0; }
 label { display: block; margin: 1rem 0 .3rem; }
 input, textarea, select, button { font: inherit; color: inherit; background: inherit; }
-input:not([type=hidden]), textarea, select { box-sizing: border-box; width: 100%; padding: .45rem; border: 1px solid #888; border-radius: 0; }
+input:not([type=hidden]):not([type=checkbox]), textarea, select { box-sizing: border-box; width: 100%; padding: .45rem; border: 1px solid #888; border-radius: 0; }
 textarea { min-height: 17rem; resize: vertical; }
 textarea.css-editor { font-family: monospace; min-height: 24rem; }
 button { border: 1px solid #888; padding: .3rem .8rem; cursor: pointer; }

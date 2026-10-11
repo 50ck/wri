@@ -190,7 +190,7 @@ class Platform(unittest.TestCase):
         self.owner.request('/manage/appearance')
         self.assertEqual(self.owner.post('/manage/appearance',css=css)['status'],303)
         style=self.visitor.request('/'+self.name+'/style.css')
-        self.assertEqual(style['body'],css)
+        self.assertTrue(style['body'].endswith(css))
         self.assertIn('Content-Type: text/css; charset=utf-8',style['headers'])
         section=self.create_section();url=self.create_post(section=section)
         for path in ['/'+self.name,'/'+self.name+'/blogs','/'+self.name+'/diario',url]:

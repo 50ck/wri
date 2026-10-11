@@ -4,6 +4,7 @@ $dir=sys_get_temp_dir().'/blog-core-'.bin2hex(random_bytes(6));mkdir($dir,0700);
 putenv('BLOG_MERMAID_BIN=/nonexistent');
 putenv('BLOG_DATABASE='.$dir.'/test.sqlite');putenv('BLOG_ARGON_MEMORY=8192');putenv('BLOG_ARGON_TIME=1');
 require dirname(__DIR__).'/app.php';
+function test_markdown(string $body): string { return markdown($body,$GLOBALS['blog']); }
 $checks=0;
 function check(bool $ok,string $label): void { global $checks;if (!$ok) throw new RuntimeException($label);$checks++; }
 function rejects(callable $fn,int $status): void { try {$fn();}catch(HttpError $e){check($e->status===$status,'Unexpected rejection');return;}throw new RuntimeException('Expected rejection'); }
@@ -83,10 +84,10 @@ try {
     $foreign=add_section($other,'Foreign','');rejects(fn()=>save_post($blog,null,'Wrong','Body',$foreign,'published'),404);
     save_css($blog,'body {color: red}');check(one('SELECT custom_css FROM blogs WHERE id=?',[$blog['id']])['custom_css']==='body {color: red}','CSS persistence');
     rejects(fn()=>save_css($blog,str_repeat('a',65537)),413);
-    $html=markdown("# Título\n\n**fuerte** *suave* `código`\n\n- uno\n- dos\n\n> cita\n\n---\n\n```\n<script>alert(1)</script>\n```\n\n[mal](javascript:alert(1))\n\n![imagen](https://tracker.test/image)\n\n<img src=x onerror=alert(1)>");
+    $html=test_markdown("# Título\n\n**fuerte** *suave* `código`\n\n- uno\n- dos\n\n> cita\n\n---\n\n```\n<script>alert(1)</script>\n```\n\n[mal](javascript:alert(1))\n\n![imagen](https://tracker.test/image)\n\n<img src=x onerror=alert(1)>");
     foreach(['<h1','<strong>','<em>','<code>','<ul>','<blockquote>','<hr','<pre>'] as $tag)check(str_contains($html,$tag),'Markdown '.$tag);
     check(!str_contains($html,'<script')&&!str_contains($html,'<img')&&!str_contains($html,'href="javascript:'),'Markdown sanitization');
-    $stress=markdown(file_get_contents(__DIR__.'/fixtures/markdown-stress.md'));
+    $stress=test_markdown(file_get_contents(__DIR__.'/fixtures/markdown-stress.md'));
     $document=new DOMDocument();$document->loadHTML('<?xml encoding="UTF-8"><div id="main">'.$stress.'</div>');
     $xpath=new DOMXPath($document);
     foreach (['introducción','después-del-código','repetido','repetido-1','repetido-1-1','main-1'] as $id) check((bool)$document->getElementById($id),'Unique heading anchor '.$id);
@@ -101,39 +102,39 @@ try {
     check(str_contains($stress,'Texto alternativo preservado') && $document->getElementsByTagName('img')->length===0,'Image alternative text without resource loading');
     check($xpath->query('//a[@title="texto de ayuda"]')->length===1,'Safe link title preserved');
     check($xpath->query('//*[@style or @onclick or @onerror]')->length===0 && $document->getElementsByTagName('script')->length===0,'Extended Markdown remains inert');
-    $alerts=markdown("> [!NOTE]\n> contenido **fuerte**\n\n> [!TIP]\n> consejo con [enlace](https://example.com)\n\n> [!WARNING]\n> <script>inert</script>\n\n> [!OTHER]\n> texto normal\n\n`[!NOTE]`\n\n```text\n[!TIP]\n```");
+    $alerts=test_markdown("> [!NOTE]\n> contenido **fuerte**\n\n> [!TIP]\n> consejo con [enlace](https://example.com)\n\n> [!WARNING]\n> <script>inert</script>\n\n> [!OTHER]\n> texto normal\n\n`[!NOTE]`\n\n```text\n[!TIP]\n```");
     foreach (['note'=>'nota','tip'=>'consejo','warning'=>'aviso'] as $kind=>$label) check(str_contains($alerts,'class="markdown-alert markdown-alert-'.$kind.'"') && str_contains($alerts,'class="markdown-alert-title">'.$label.'</p>'),'Markdown alert '.$kind);
     check(str_contains($alerts,'<strong>fuerte</strong>') && str_contains($alerts,'href="https://example.com"'),'Alerts retain inline formatting');
     check(str_contains($alerts,'[!OTHER]') && str_contains($alerts,'<code>[!NOTE]</code>') && str_contains($alerts,'<code>[!TIP]</code>'),'Unknown markers and code stay literal');
     check(!str_contains($alerts,'<script>') && str_contains($alerts,'&lt;script&gt;'),'Alerts escape HTML');
     foreach (['js'=>'const pato = "hola";', 'json'=>'{"pato": 42}', 'diff'=>"+nuevo\n-viejo", 'php'=>'<?php echo "hola";', 'html'=>'<div title="hola">texto</div>', 'python'=>'print("hola")', 'css'=>'body { color: red; }', 'sql'=>'SELECT 42;', 'sh'=>'echo "hola"', 'yaml'=>'pato: true', 'ini'=>'[blog]\ntitle=hola', 'ts'=>'const pato: string = "hola";', 'md'=>'# título'] as $language=>$source) {
-        $rendered=markdown("```".$language."\n".$source."\n```");
+        $rendered=test_markdown("```".$language."\n".$source."\n```");
         $codeDoc=new DOMDocument();$codeDoc->loadHTML('<?xml encoding="UTF-8">'.$rendered);
         check(str_contains($rendered,'class="hljs-') && $codeDoc->getElementsByTagName('code')->item(0)->textContent===$source,'Server highlighting preserves '.$language);
     }
     $payload='</code><script>alert(1)</script><img src=x onerror=alert(1)> & "字"';
-    $safe=markdown("```js\n".$payload."\n```");
+    $safe=test_markdown("```js\n".$payload."\n```");
     $safeDoc=new DOMDocument();$safeDoc->loadHTML('<?xml encoding="UTF-8">'.$safe);
     check($safeDoc->getElementsByTagName('code')->item(0)->textContent===$payload && !$safeDoc->getElementsByTagName('script')->length && !$safeDoc->getElementsByTagName('img')->length,'Highlighting cannot inject HTML');
-    check(markdown("```unknown\n<script>\n```")==='<pre><code>&lt;script&gt;</code></pre>','Unknown languages remain escaped');
+    check(test_markdown("```unknown\n<script>\n```")==='<pre><code>&lt;script&gt;</code></pre>','Unknown languages remain escaped');
     $large=str_repeat('const pato = "hola"; ',1000);
-    check(!str_contains(markdown("```js\n".$large."\n```"),'hljs-'),'Oversized code skips highlighting');
-    $bounded=markdown(str_repeat("```js\n".str_repeat('const pato = "hola"; ',500)."\n```\n\n",8));
+    check(!str_contains(test_markdown("```js\n".$large."\n```"),'hljs-'),'Oversized code skips highlighting');
+    $bounded=test_markdown(str_repeat("```js\n".str_repeat('const pato = "hola"; ',500)."\n```\n\n",8));
     check(substr_count($bounded,'<pre><code>const pato')===2,'Per-document highlighting budget');
     $flow=file_get_contents(__DIR__.'/fixtures/flowchart.mmd');
     require_once dirname(__DIR__).'/extensions/mermaid/render.php';
-    check(str_contains(markdown("```mermaid\n".$flow."```"),'<pre><code>'),'Missing renderer preserves escaped source');
+    check(str_contains(test_markdown("```mermaid\n".$flow."```"),'<pre><code>'),'Missing renderer preserves escaped source');
     $binary=dirname(__DIR__).'/extensions/mermaid/bin/mmdr';
     if (is_executable($binary)) {
         putenv('BLOG_MERMAID_BIN='.$binary);
-        $diagram=markdown("```mermaid\n".$flow."```");
+        $diagram=test_markdown("```mermaid\n".$flow."```");
         check(str_contains($diagram,'mermaid-native') && !str_contains($diagram,'<pre>'),'Mermaid addon renders native SVG');
         check(str_contains($diagram,'class="blog-diagram"') && str_contains($diagram,'<desc>flowchart LR'),'Accessible diagram includes source');
-        check(substr_count(markdown(str_repeat("```mermaid\nflowchart LR\nA --> B\n```\n\n",17)),'mermaid-native')===16,'Per-document diagram limit');
+        check(substr_count(test_markdown(str_repeat("```mermaid\nflowchart LR\nA --> B\n```\n\n",17)),'mermaid-native')===16,'Per-document diagram limit');
         putenv('BLOG_MERMAID_BIN=/nonexistent');
     }
-    check(!str_contains(markdown("<svg onload=alert(1)><script>evil</script></svg>"),'<svg'),'Raw user SVG remains escaped');
-    $mathematics=markdown(file_get_contents(__DIR__.'/fixtures/math-stress.md'));
+    check(!str_contains(test_markdown("<svg onload=alert(1)><script>evil</script></svg>"),'<svg'),'Raw user SVG remains escaped');
+    $mathematics=test_markdown(file_get_contents(__DIR__.'/fixtures/math-stress.md'));
     $mathDoc=new DOMDocument();$mathDoc->loadHTML('<?xml encoding="UTF-8">'.$mathematics,LIBXML_NOERROR|LIBXML_NOWARNING);$mathPath=new DOMXPath($mathDoc);
     check($mathDoc->getElementsByTagName('math')->length===44 && !$mathDoc->getElementsByTagName('pre')->length,'All 44 stress formulas render without raw blocks');
     check($mathPath->query('//math[@display="inline"]')->length===23 && $mathPath->query('//math[@display="block"]')->length===21,'Inline versus display formulas');
@@ -142,17 +143,17 @@ try {
     check($mathPath->query('//mtable/mtr/mtd/mrow/mstyle/mi[text()="h"]')->length===1,'Last matrix cell preserves grouped arrow label');
     check($mathPath->query('//mtable[@rowlines="none solid none"]')->length===1,'Horizontal matrix rule retains correct row');
     check(str_contains($mathematics,'penalización') && str_contains($mathematics,'suavidad'),'Unicode formula annotations preserved');
-    $delimiters=markdown('Inline $x^2$ and \(\frac{1}{2}\).'."\n\n".'\[\sqrt{x}\]'."\n\n".'$$x+1$$'."\n\n```math\nx^2\n```");
+    $delimiters=test_markdown('Inline $x^2$ and \(\frac{1}{2}\).'."\n\n".'\[\sqrt{x}\]'."\n\n".'$$x+1$$'."\n\n```math\nx^2\n```");
     check(substr_count($delimiters,'<math ')===5,'Dollar, parenthesis, bracket and math-fence delimiters');
-    $literal=markdown('Precio: $5 y $10.'."\n\n".'Literal: \$x\$. ` $x^2$ `'."\n\n```text\n\$x+1\$\n\$\$x\$\$\n```");
+    $literal=test_markdown('Precio: $5 y $10.'."\n\n".'Literal: \$x\$. ` $x^2$ `'."\n\n```text\n\$x+1\$\n\$\$x\$\$\n```");
     check(!str_contains($literal,'<math ') && str_contains($literal,'$5 y $10'),'Currency, escaped dollars and code remain literal');
-    check(str_contains(markdown("$$\nx+1"),'$$') && !str_contains(markdown("$$\nx+1"),'<math '),'Unclosed display delimiter preserves source');
+    check(str_contains(test_markdown("$$\nx+1"),'$$') && !str_contains(test_markdown("$$\nx+1"),'<math '),'Unclosed display delimiter preserves source');
     check(math_element(new DOMDocument(),str_repeat('{',49).'x'.str_repeat('}',49),'inline')===null && math_element(new DOMDocument(),str_repeat('x',4097),'inline')===null,'Formula depth and size limits');
-    check(substr_count(markdown(str_repeat('$x$ ',129)),'<math ')===128,'Formula count limit');
-    $unsafeMath=markdown('$\text{<script>alert(1)</script>}$ $\href{https://evil.test}{test}$');
+    check(substr_count(test_markdown(str_repeat('$x$ ',129)),'<math ')===128,'Formula count limit');
+    $unsafeMath=test_markdown('$\text{<script>alert(1)</script>}$ $\href{https://evil.test}{test}$');
     $unsafeDoc=new DOMDocument();$unsafeDoc->loadHTML('<?xml encoding="UTF-8">'.$unsafeMath,LIBXML_NOERROR|LIBXML_NOWARNING);$unsafePath=new DOMXPath($unsafeDoc);
     check(!$unsafeDoc->getElementsByTagName('script')->length && !$unsafePath->query('//*[@href or @style or @onclick or @onerror]')->length,'Formula output cannot introduce active content');
-    check(!str_contains(markdown('<math href="javascript:alert(1)"><mi>x</mi></math>'),'<math '),'Raw user MathML remains escaped');
+    check(!str_contains(test_markdown('<math href="javascript:alert(1)"><mi>x</mi></math>'),'<math '),'Raw user MathML remains escaped');
     $maliciousSvg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" onload="alert(1)"><script>evil</script><foreignObject><p xmlns="http://www.w3.org/1999/xhtml">evil</p></foreignObject><image href="https://tracker.test"/><style>body{color:red}</style><path d="M0 0 L10 10" style="stroke:red" fill="url(https://tracker.test)"/><a href="javascript:alert(1)"><text>link</text></a></svg>';
     $clean=sanitize_diagram_svg($maliciousSvg,'safe source');
     check($clean!==null && !preg_match('/<(?:script|foreignObject|image|style|a)\b|onload=|href=|style=|url\(https:/i',$clean),'Native SVG removes active elements, links, styles and resource references');
@@ -184,6 +185,6 @@ try {
     rejects(fn()=>delete_account($blog,'wrong','alice'),422);
     rejects(fn()=>delete_account($blog,'contraseña muy larga','wrong'),422);
     delete_account($blog,'contraseña muy larga','alice');
-    foreach(['users','blogs','sections','posts','redirects'] as $table)check(!one("SELECT * FROM $table WHERE ".($table==='users'?'id':($table==='blogs'?'user_id':'blog_id')).'=?',[$table==='users'||$table==='blogs'?$user['id']:$blog['id']]),'Cascade '.$table);
+    foreach(['users','blogs','sections','posts','redirects','blog_addons'] as $table)check(!one("SELECT * FROM $table WHERE ".($table==='users'?'id':($table==='blogs'?'user_id':'blog_id')).'=?',[$table==='users'||$table==='blogs'?$user['id']:$blog['id']]),'Cascade '.$table);
     echo "$checks core checks passed.\n";
 } finally { foreach(glob($dir.'/*') as $file)unlink($file);rmdir($dir); }

@@ -5,5 +5,5 @@ return [
     'database' => '/var/lib/blog/blog.sqlite',
     'session_path' => '/var/lib/blog/sessions',
     'registration' => true,
-    // 'mermaid_bin' => '/opt/blog/bin/mmdr', // optional native renderer
+    // 'mermaid_bin' => '/opt/blog/extensions/mermaid/bin/mmdr', // optional native renderer
 ];
