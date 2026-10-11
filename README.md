@@ -195,7 +195,7 @@ return [
 ];
 ```
 
-The registry discovers descriptors on each request and validates their API and callbacks. Keep descriptors cheap; load libraries with `require_once` inside their callbacks. No upload interface, package manager, remote discovery or client-side code is involved. Missing addons disappear from the checklist and cannot run. Their saved activation rows remain until the owner saves a new selection, so restoring a folder before that restores its activation. Disabling or removing a folder does not delete future addon content.
+The registry discovers descriptors on each request and validates their API and callbacks. Keep descriptors cheap; load libraries with `require_once` inside their callbacks. Namespace or prefix addon functions/classes to prevent name collisions. No upload interface, package manager, remote discovery or client-side code is involved. Missing addons disappear from the checklist and cannot run. Their saved activation rows remain until the owner saves a new selection, so restoring a folder before that restores its activation. Disabling or removing a folder does not delete future addon content.
 
 The three integration points are:
 
