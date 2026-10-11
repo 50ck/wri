@@ -73,6 +73,5 @@ function math_element(DOMDocument $doc,string $tex,string $display): ?DOMElement
         }
     }
     if (strlen($doc->saveXML($math))>131072) return null;
-    $math->setAttribute('aria-label',trim($tex));
     return $math;
 }
