@@ -22,7 +22,7 @@ function page(string $key,callable $content,?string $error=null,?array $manageme
     headers_for(addonStyles:$styles);
     echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e(t($key)).' · '.e(t('brand')).'</title><link rel="stylesheet" href="/assets/base.css">';
     foreach ($styles as $id) echo '<link rel="stylesheet" href="/_addons/'.e($id).'/style.css">';
-    echo '</head><body><a class="skip" href="#main">'.e(t('skip')).'</a>';
+    echo '</head><body>';
     if ($management) {
         echo '<header><h1 class="manage-title">'.e(t('manage')).'</h1><nav aria-label="'.e(t('manage')).'">'.link_to('/manage/settings','settings').' '.link_to('/manage/sections','sections').' '.link_to('/manage/appearance','appearance').' '.link_to('/manage/addons','addons').'</nav><div class="actions">'.link_to('/'.$management['username'],'blog').'<form class="inline" method="post" action="/logout">';token_field();button('logout');echo '</form></div></header>';
     }
