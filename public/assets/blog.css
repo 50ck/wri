@@ -36,25 +36,3 @@
 .blog .markdown-alert-note { border-color: #9fc3e8; }
 .blog .markdown-alert-tip { border-color: #afd3a0; }
 .blog .markdown-alert-warning { border-color: #e0c384; }
-.blog .hljs-comment, .blog .hljs-quote { color: #b0b0b0; }
-.blog .hljs-keyword, .blog .hljs-selector-tag, .blog .hljs-meta { color: #cdb4e8; }
-.blog .hljs-string, .blog .hljs-regexp, .blog .hljs-addition { color: #afd3a0; }
-.blog .hljs-number, .blog .hljs-literal, .blog .hljs-attr, .blog .hljs-attribute { color: #e0c384; }
-.blog .hljs-title, .blog .hljs-built_in, .blog .hljs-section, .blog .hljs-name { color: #9fc3e8; }
-.blog .hljs-deletion { color: #eda7a7; }
-.blog .hljs-emphasis { font-style: italic; }
-.blog .hljs-strong { font-weight: bold; }
-
-.blog-diagram { max-width: 100%; margin: 1rem 0; scrollbar-color: #777 #171717; }
-.blog .mermaid-diagram { display: block; width: auto; height: auto; max-width: 100%; font: 14px ui-monospace, monospace; }
-.blog .mermaid-node { fill: #242424; stroke: #9fc3e8; }
-.blog .mermaid-edge { fill: none; stroke: #b5b5b5; }
-.blog .mermaid-arrow { fill: #b5b5b5; stroke: none; }
-.blog .mermaid-label-background { fill: #171717; stroke: none; }
-.blog .mermaid-label { fill: #ededed; stroke: none; text-anchor: middle; }
-
-/* Native SVG carries presentation attributes; do not inherit owner-icon strokes. */
-.blog .mermaid-native { fill: initial; stroke: none; stroke-width: initial; font: initial; }
-.blog math { font-family: math; font-size: 1.05em; }
-.math-block { display: block; max-width: 100%; overflow-x: auto; padding: .5rem 0; margin: 1.2rem 0; scrollbar-color: #777 #171717; }
-.math-block math { margin: 0 auto; }

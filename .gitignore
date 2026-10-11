@@ -6,5 +6,5 @@
 __pycache__/
 *.pyc
 
-/bin/mmdr
-/bin/mmdr.new
+/extensions/mermaid/bin/mmdr
+/extensions/mermaid/bin/mmdr.new

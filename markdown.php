@@ -1,11 +1,10 @@
 <?php
 declare(strict_types=1);
-require_once dirname(__DIR__) . '/vendor/parsedown/Parsedown.php';
-require_once __DIR__.'/mermaid.php';
-require_once __DIR__.'/diagrams.php';
-require_once __DIR__.'/math.php';
-function markdown(string $body): string {
-    $parser = new MathMarkdown();
+require_once __DIR__.'/vendor/parsedown/Parsedown.php';
+function markdown(string $body,?array $blog=null): string {
+    $active=$blog===null ? addons() : active_addons($blog);
+    $parser=new AddonMarkdown();
+    foreach ($active as $addon) if (isset($addon['parser'])) ($addon['parser'])($parser);
     $html = $parser->setSafeMode(true)->setMarkupEscaped(true)->setUrlsLinked(false)->text($body);
     // Defense in depth: no embeds, resource-loading elements or active attributes.
     $doc = new DOMDocument();
@@ -13,7 +12,7 @@ function markdown(string $body): string {
     $doc->loadHTML('<?xml encoding="UTF-8"><div id="markdown-root">'.$html.'</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD | LIBXML_NONET);
     libxml_clear_errors(); libxml_use_internal_errors($previous);
     $allowed=['p','h1','h2','h3','h4','h5','h6','em','strong','a','ul','ol','li','blockquote','pre','code','hr','br','del','table','thead','tbody','tr','th','td'];
-    $headings=[]; $tables=[]; $blocks=[]; $quotes=[]; $formulas=[];
+    $headings=[]; $tables=[]; $quotes=[];
     foreach (iterator_to_array($doc->getElementsByTagName('*')) as $node) {
         if ($node->getAttribute('id')==='markdown-root') continue;
         if ($node->nodeName==='img') {
@@ -21,8 +20,8 @@ function markdown(string $body): string {
             continue;
         }
         if (!in_array($node->nodeName,$allowed,true)) { $node->parentNode?->removeChild($node); continue; }
-        $alignment=null; $language=null;
-        if ($node->nodeName==='code' && in_array($node->getAttribute('class'),['math-inline','math-block','language-math'],true)) $formulas[]=[$node,$node->getAttribute('class')==='math-inline' ? 'inline' : 'block'];
+        $alignment=null; $language=null; $marker=null;
+        if ($node->nodeName==='code' && preg_match('/\Aaddon-[a-z0-9-]+\z/',$node->getAttribute('class'))) $marker=$node->getAttribute('class');
         if ($node->nodeName==='code' && $node->parentNode->nodeName==='pre' && preg_match('/\Alanguage-([a-z0-9_-]+)\z/i',$node->getAttribute('class'),$match)) $language=strtolower($match[1]);
         if (in_array($node->nodeName,['th','td'],true) && preg_match('/\Atext-align: (left|center|right);\z/', $node->getAttribute('style'), $match)) $alignment=$match[1];
         foreach (iterator_to_array($node->attributes) as $attr) {
@@ -34,11 +33,11 @@ function markdown(string $body): string {
             }
             $node->removeAttribute($attr->name);
         }
+        if ($marker || $language) $node->setAttribute('class',$marker ?? 'language-'.$language);
         if ($alignment) $node->setAttribute('class','markdown-align-'.$alignment);
         if ($node->nodeName==='a') $node->setAttribute('rel','nofollow noreferrer');
         if (preg_match('/\Ah[1-6]\z/', $node->nodeName)) $headings[]=$node;
         if ($node->nodeName==='table') $tables[]=$node;
-        if ($language) $blocks[]=[$node,$language];
         if ($node->nodeName==='blockquote') $quotes[]=$node;
     }
     foreach ($quotes as $quote) {
@@ -54,54 +53,8 @@ function markdown(string $body): string {
         $title->appendChild($doc->createTextNode(t('alert_'.$type)));
         $quote->insertBefore($title,$quote->firstChild);
     }
-    $mathBudget=65536; $mathCount=0;
-    foreach ($formulas as [$code,$display]) {
-        $tex=$code->textContent; $size=strlen($tex);
-        $math=$mathCount++<128 && $size<=$mathBudget ? math_element($doc,$tex,$display) : null;
-        $mathBudget-=$size;
-        if (!$math) continue;
-        if ($display==='block') {
-            $wrapper=$doc->createElement('span');$wrapper->setAttribute('class','math-block');
-            $wrapper->setAttribute('tabindex','0');$wrapper->setAttribute('role','region');$wrapper->setAttribute('aria-label',t('formula'));
-            $wrapper->appendChild($math);
-            $target=$code->parentNode->nodeName==='pre' ? $code->parentNode : $code;
-            $target->parentNode->replaceChild($wrapper,$target);
-        } else $code->parentNode->replaceChild($math,$code);
-    }
-    // Explicit languages only; oversized blocks stay escaped plain text.
-    $budget=65536; $diagramCount=0; $diagramDeadline=microtime(true)+6;
-    foreach ($blocks as [$code,$language]) {
-        if ($language==='mermaid') {
-            $svg=$diagramCount++<16 ? diagram_svg($code->textContent,$diagramDeadline) : null;
-            if ($svg!==null) {
-                $fragment=$doc->createDocumentFragment();
-                // HTML establishes the SVG namespace; avoid libxml's default: prefix.
-                if ($fragment->appendXML(str_replace(' xmlns="http://www.w3.org/2000/svg"','',$svg))) {
-                    $wrapper=$doc->createElement('div'); $wrapper->setAttribute('class','blog-diagram');
-                    $wrapper->setAttribute('tabindex','0'); $wrapper->setAttribute('role','region');
-                    $wrapper->setAttribute('aria-label',t('diagram')); $wrapper->appendChild($fragment);
-                    $pre=$code->parentNode; $pre->parentNode->replaceChild($wrapper,$pre);
-                }
-            } else {
-                $notice=$doc->createElement('p'); $notice->appendChild($doc->createTextNode(t('diagram_unsupported')));
-                $code->parentNode->parentNode->insertBefore($notice,$code->parentNode);
-            }
-            continue;
-        }
-        $size=strlen($code->textContent);
-        if ($size>16384 || $size>$budget) continue;
-        $budget-=$size;
-        $highlighted=highlight_code($language,$code->textContent);
-        if ($highlighted===null) continue;
-        $fragment=$doc->createDocumentFragment();
-        if (!$fragment->appendXML($highlighted)) continue;
-        // Only text and known token spans can enter the sanitized document.
-        $valid=true;
-        foreach ($fragment->childNodes as $child) if (!highlight_node_safe($child)) { $valid=false; break; }
-        if (!$valid || $fragment->textContent!==$code->textContent) continue;
-        while ($code->firstChild) $code->removeChild($code->firstChild);
-        $code->appendChild($fragment);
-    }
+    foreach ($active as $addon) if (isset($addon['render'])) ($addon['render'])($doc,['blog'=>$blog]);
+    foreach ($doc->getElementsByTagName('code') as $code) $code->removeAttribute('class');
     // IDs originate exclusively from escaped heading text, never raw user HTML.
     $used=['main'=>true,'markdown-root'=>true]; $targets=[];
     foreach ($headings as $heading) {
@@ -133,22 +86,27 @@ function markdown(string $body): string {
     return $result;
 }
 
-function highlight_code(string $language, string $code): ?string {
-    $aliases=['js'=>'javascript','ts'=>'typescript','html'=>'xml','sh'=>'bash','shell'=>'bash','py'=>'python','yml'=>'yaml','md'=>'markdown'];
-    $language=$aliases[$language] ?? $language;
-    if (!in_array($language,['bash','css','diff','ini','javascript','json','markdown','php','python','sql','typescript','xml','yaml'],true)) return null;
-    static $highlighter=null;
-    if ($highlighter===null) {
-        require_once dirname(__DIR__).'/vendor/highlight/Highlight/Autoloader.php';
-        spl_autoload_register([\Highlight\Autoloader::class,'load']);
-        $highlighter=new \Highlight\Highlighter();
+
+// Small adapter for Parsedown's native rule dispatch; extensions register callbacks.
+class AddonMarkdown extends Parsedown {
+    private array $rules=[];
+    public function add_inline(array $markers,callable $callback): void {
+        $type='Addon'.count($this->rules);$this->rules['inline'.$type]=$callback;
+        foreach ($markers as $marker) {
+            $this->InlineTypes[$marker]??=[];array_unshift($this->InlineTypes[$marker],$type);
+            if (!str_contains($this->inlineMarkerList,$marker)) $this->inlineMarkerList.=$marker;
+        }
     }
-    try { return $highlighter->highlight($language,$code)->value; }
-    catch (Throwable $error) { error_log('Syntax highlighting failed: '.$error->getMessage()); return null; }
-}
-function highlight_node_safe(DOMNode $node): bool {
-    if ($node->nodeType===XML_TEXT_NODE) return true;
-    if (!$node instanceof DOMElement || $node->tagName!=='span' || $node->attributes->length!==1 || !preg_match('/\Ahljs-[a-z0-9_-]+(?: hljs-[a-z0-9_-]+)*\z/',$node->getAttribute('class'))) return false;
-    foreach ($node->childNodes as $child) if (!highlight_node_safe($child)) return false;
-    return true;
+    public function add_block(array $markers,callable $start,?callable $continue=null,?callable $complete=null): void {
+        $type='Addon'.count($this->rules);$this->rules['block'.$type]=$start;
+        if ($continue) $this->rules['block'.$type.'Continue']=$continue;
+        if ($complete) $this->rules['block'.$type.'Complete']=$complete;
+        foreach ($markers as $marker) { $this->BlockTypes[$marker]??=[];array_unshift($this->BlockTypes[$marker],$type); }
+    }
+    public function __call(string $method,array $arguments): mixed {
+        if (!isset($this->rules[$method])) throw new LogicException('Unknown Markdown rule');
+        return ($this->rules[$method])(...$arguments);
+    }
+    protected function isBlockContinuable($type) { return isset($this->rules['block'.$type.'Continue']) || parent::isBlockContinuable($type); }
+    protected function isBlockCompletable($type) { return isset($this->rules['block'.$type.'Complete']) || parent::isBlockCompletable($type); }
 }

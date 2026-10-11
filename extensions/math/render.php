@@ -1,15 +1,6 @@
 <?php
 declare(strict_types=1);
-
-// Keep TeX out of Markdown's emphasis/escaping handlers, including inside quotes/lists.
-class MathMarkdown extends Parsedown {
-    public function __construct() {
-        $this->InlineTypes['$']=['Math'];
-        array_unshift($this->InlineTypes['\\'],'Math');
-        $this->inlineMarkerList.='$';
-        $this->BlockTypes['$']=['Math']; $this->BlockTypes['\\']=['Math'];
-    }
-    protected function inlineMath($excerpt) {
+function addon_math_inline($excerpt) {
         $text=$excerpt['text']; $display='inline'; $match=[];
         if (str_starts_with($text,'$$')) {
             if (!preg_match('/\A\$\$(.+?)\$\$/s',$text,$match)) return;
@@ -21,17 +12,17 @@ class MathMarkdown extends Parsedown {
             $end=strpos($text,'\\]',2); if ($end===false) return;
             $match=[substr($text,0,$end+2),substr($text,2,$end-2)]; $display='block';
         } elseif (!preg_match('/\A\$(?![\s$])((?:\\\\.|[^$\\\\\n])+?)(?<!\s)\$(?![\d$])/',$text,$match)) return;
-        return ['extent'=>strlen($match[0]),'element'=>['name'=>'code','attributes'=>['class'=>'math-'.$display],'text'=>$match[1]]];
+        return ['extent'=>strlen($match[0]),'element'=>['name'=>'code','attributes'=>['class'=>'addon-math-'.$display],'text'=>$match[1]]];
     }
-    protected function blockMath($line) {
+function addon_math_start($line) {
         $text=trim($line['text']);
         $open=str_starts_with($text,'$$') ? '$$' : (str_starts_with($text,'\\[') ? '\\[' : null);
         if (!$open) return;
         $close=$open==='$$' ? '$$' : '\\]'; $rest=substr($text,2);
         $complete=$rest!=='' && str_ends_with($rest,$close);
-        return ['close'=>$close,'open'=>$open,'complete'=>$complete,'element'=>['name'=>'pre','element'=>['name'=>'code','attributes'=>['class'=>'math-block'],'text'=>$complete ? substr($rest,0,-2) : $rest]]];
+        return ['close'=>$close,'open'=>$open,'complete'=>$complete,'element'=>['name'=>'pre','element'=>['name'=>'code','attributes'=>['class'=>'addon-math-block'],'text'=>$complete ? substr($rest,0,-2) : $rest]]];
     }
-    protected function blockMathContinue($line,$block) {
+function addon_math_continue($line,$block) {
         if ($block['complete']) return;
         $text=$line['body'];
         if (isset($block['interrupted'])) { $block['element']['element']['text'].=str_repeat("\n",$block['interrupted']);unset($block['interrupted']); }
@@ -40,14 +31,13 @@ class MathMarkdown extends Parsedown {
         } else $block['element']['element']['text'].="\n".$text;
         return $block;
     }
-    protected function blockMathComplete($block) {
+function addon_math_complete($block) {
         if (!$block['complete']) {
             unset($block['element']['element']['attributes']);
             $block['element']['element']['text']=$block['open'].$block['element']['element']['text'];
         }
         return $block;
     }
-}
 function math_element(DOMDocument $doc,string $tex,string $display): ?DOMElement {
     if (strlen($tex)>4096 || trim($tex)==='' || !mb_check_encoding($tex,'UTF-8') || preg_match('/[\x00-\x08\x0b\x0c\x0e-\x1f]/',$tex)) return null;
     $depth=0;
@@ -56,7 +46,7 @@ function math_element(DOMDocument $doc,string $tex,string $display): ?DOMElement
     static $loaded=false;
     if (!$loaded) {
         spl_autoload_register(function (string $class): void {
-            if (str_starts_with($class,'Latex2MathML\\')) require dirname(__DIR__).'/vendor/latex2mathml/src/'.str_replace('\\','/',substr($class,13)).'.php';
+            if (str_starts_with($class,'Latex2MathML\\')) require __DIR__.'/vendor/src/'.str_replace('\\','/',substr($class,13)).'.php';
         }); $loaded=true;
     }
     set_error_handler(static function (int $level,string $message): never { throw new ErrorException($message,0,$level); });
@@ -74,4 +64,26 @@ function math_element(DOMDocument $doc,string $tex,string $display): ?DOMElement
     }
     if (strlen($doc->saveXML($math))>131072) return null;
     return $math;
+}
+
+function addon_math_render(DOMDocument $doc,array $context): void {
+    $formulas=[];
+    foreach (iterator_to_array($doc->getElementsByTagName('code')) as $code) {
+        $class=$code->getAttribute('class');
+        if (in_array($class,['addon-math-inline','addon-math-block','language-math'],true)) $formulas[]=[$code,$class==='addon-math-inline'?'inline':'block'];
+    }
+    $mathBudget=65536; $mathCount=0;
+    foreach ($formulas as [$code,$display]) {
+        $tex=$code->textContent; $size=strlen($tex);
+        $math=$mathCount++<128 && $size<=$mathBudget ? math_element($doc,$tex,$display) : null;
+        $mathBudget-=$size;
+        if (!$math) continue;
+        if ($display==='block') {
+            $wrapper=$doc->createElement('span');$wrapper->setAttribute('class','math-block');
+            $wrapper->setAttribute('tabindex','0');$wrapper->setAttribute('role','region');$wrapper->setAttribute('aria-label',t('formula'));
+            $wrapper->appendChild($math);
+            $target=$code->parentNode->nodeName==='pre' ? $code->parentNode : $code;
+            $target->parentNode->replaceChild($wrapper,$target);
+        } else $code->parentNode->replaceChild($math,$code);
+    }
 }

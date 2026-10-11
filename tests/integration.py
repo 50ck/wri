@@ -59,7 +59,7 @@ class Platform(unittest.TestCase):
     def setUpClass(cls):
         cls.temp = tempfile.TemporaryDirectory(prefix='blog-integration-')
         cls.env = dict(os.environ, BLOG_DATABASE=cls.temp.name+'/test.sqlite', BLOG_SESSION_PATH=cls.temp.name+'/sessions', BLOG_ARGON_MEMORY='8192', BLOG_ARGON_TIME='1')
-        subprocess.run(PHP+['bin/install.php'], cwd=ROOT, env=cls.env, check=True, capture_output=True)
+        subprocess.run(PHP+['install.php'], cwd=ROOT, env=cls.env, check=True, capture_output=True)
         cls.counter = 0
         cls.server = None
         if LIVE:
@@ -79,7 +79,7 @@ class Platform(unittest.TestCase):
         cls.temp.cleanup()
     def setUp(self):
         if LIVE:
-            subprocess.run(PHP+['-r', 'require "src/bootstrap.php"; query("DELETE FROM rate_limits");'],cwd=ROOT,env=self.env,check=True,capture_output=True)
+            subprocess.run(PHP+['-r', 'require "app.php"; query("DELETE FROM rate_limits");'],cwd=ROOT,env=self.env,check=True,capture_output=True)
         type(self).counter += 1
         self.name = 'owner-'+str(self.counter)
         self.owner = Client(self.env, 'owner-'+str(self.counter))
@@ -243,7 +243,7 @@ class Platform(unittest.TestCase):
         self.assertTrue(any(h.startswith('Retry-After: ') for h in response['headers']))
     def test_registration_and_post_creation_limits(self):
         if LIVE:
-            subprocess.run(PHP+['-r', 'require "src/bootstrap.php"; query("DELETE FROM rate_limits WHERE bucket LIKE ?", ["registration:%"]);'],cwd=ROOT,env=self.env,check=True,capture_output=True)
+            subprocess.run(PHP+['-r', 'require "app.php"; query("DELETE FROM rate_limits WHERE bucket LIKE ?", ["registration:%"]);'],cwd=ROOT,env=self.env,check=True,capture_output=True)
         client=Client(self.env,'registration-limit');client.request('/register')
         for _ in range(5):
             self.assertEqual(client.post('/register',username='admin',new_password='una contraseña larga',confirm_password='una contraseña larga')['status'],422)

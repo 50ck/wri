@@ -1,0 +1,9 @@
+.blog .hljs-comment, .blog .hljs-quote { color: #b0b0b0; }
+.blog .hljs-keyword, .blog .hljs-selector-tag, .blog .hljs-meta { color: #cdb4e8; }
+.blog .hljs-string, .blog .hljs-regexp, .blog .hljs-addition { color: #afd3a0; }
+.blog .hljs-number, .blog .hljs-literal, .blog .hljs-attr, .blog .hljs-attribute { color: #e0c384; }
+.blog .hljs-title, .blog .hljs-built_in, .blog .hljs-section, .blog .hljs-name { color: #9fc3e8; }
+.blog .hljs-deletion { color: #eda7a7; }
+.blog .hljs-emphasis { font-style: italic; }
+.blog .hljs-strong { font-weight: bold; }
+

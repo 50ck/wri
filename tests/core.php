@@ -3,13 +3,13 @@ declare(strict_types=1);
 $dir=sys_get_temp_dir().'/blog-core-'.bin2hex(random_bytes(6));mkdir($dir,0700);
 putenv('BLOG_MERMAID_BIN=/nonexistent');
 putenv('BLOG_DATABASE='.$dir.'/test.sqlite');putenv('BLOG_ARGON_MEMORY=8192');putenv('BLOG_ARGON_TIME=1');
-require dirname(__DIR__).'/src/bootstrap.php';
+require dirname(__DIR__).'/app.php';
 $checks=0;
 function check(bool $ok,string $label): void { global $checks;if (!$ok) throw new RuntimeException($label);$checks++; }
 function rejects(callable $fn,int $status): void { try {$fn();}catch(HttpError $e){check($e->status===$status,'Unexpected rejection');return;}throw new RuntimeException('Expected rejection'); }
 try {
     // Upgrade a real v1 database, including conflicting section paths.
-    db()->exec(file_get_contents(dirname(__DIR__).'/database/migrations/001.sql'));
+    db()->exec(initial_schema());
     db()->exec('CREATE TABLE migrations (version TEXT PRIMARY KEY, applied_at TEXT NOT NULL)');
     query('INSERT INTO migrations VALUES (?,?)',['001.sql',now()]);
     query('INSERT INTO users(username,password_hash,created_at,updated_at) VALUES (?,?,?,?)',['legacy','unused',now(),now()]);
@@ -178,7 +178,7 @@ try {
     $first=sanitize_diagram_svg($markers,'first');$second=sanitize_diagram_svg($markers,'second');
     preg_match('/id="([^"]+)"/',$first,$firstId);preg_match('/id="([^"]+)"/',$second,$secondId);
     check($firstId[1]!==$secondId[1] && str_contains($first,'url(#'.$firstId[1].')'),'Diagram marker IDs are isolated and references preserved');
-    $binary=dirname(__DIR__).'/bin/mmdr';
+    $binary=dirname(__DIR__).'/extensions/mermaid/bin/mmdr';
     if (is_executable($binary)) {
         preg_match_all('/```mermaid\n(.*?)```/s',file_get_contents(__DIR__.'/fixtures/diagram-stress.md'),$corpus);
         foreach ($corpus[1] as $index=>$source) {
@@ -190,7 +190,7 @@ try {
         check(native_diagram('flowchart LR;A-->B',$binary,microtime(true)-1)===null,'Native render deadline');
         $slow=$dir.'/slow-renderer';file_put_contents($slow,"#!/bin/sh\nexec sleep 5\n");chmod($slow,0700);
         $started=microtime(true);check(native_diagram('flowchart LR;A-->B',$slow,microtime(true)+.05)===null && microtime(true)-$started<1,'Slow renderer is terminated');
-    } else echo "Native Mermaid corpus skipped: run php bin/install-renderer.php.\n";
+    } else echo "Native Mermaid corpus skipped: run php extensions/mermaid/install.php.\n";
     check(e('<"&')==='&lt;&quot;&amp;','HTML escaping');
     delete_post($blog,$post);rejects(fn()=>owned_post($blog,$post),404);
     rejects(fn()=>delete_account($blog,'wrong','alice'),422);

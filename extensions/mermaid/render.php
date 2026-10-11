@@ -74,8 +74,27 @@ function sanitize_diagram_svg(string $svg,string $source): ?string {
     $description=$out->createElement('desc');$description->appendChild($out->createTextNode($source));$root->insertBefore($description,$root->firstChild);
     return $out->saveXML($root);
 }
-function diagram_svg(string $source,float $deadline): ?string {
-    $binary=config()['mermaid_bin'];
-    if (is_executable($binary)) return native_diagram($source,$binary,$deadline);
-    return mermaid_svg($source);
+function addon_mermaid_render(DOMDocument $doc,array $context): void {
+    $diagramCount=0;$diagramDeadline=microtime(true)+6;
+    foreach (iterator_to_array($doc->getElementsByTagName('code')) as $code) {
+        $language=substr($code->getAttribute('class'),9);
+        if ($code->parentNode?->nodeName!=='pre') continue;
+        if ($language==='mermaid') {
+            $svg=$diagramCount++<16 ? native_diagram($code->textContent,getenv('BLOG_MERMAID_BIN') ?: (config()['mermaid_bin'] ?? __DIR__.'/bin/mmdr'),$diagramDeadline) : null;
+            if ($svg!==null) {
+                $fragment=$doc->createDocumentFragment();
+                // HTML establishes the SVG namespace; avoid libxml's default: prefix.
+                if ($fragment->appendXML(str_replace(' xmlns="http://www.w3.org/2000/svg"','',$svg))) {
+                    $wrapper=$doc->createElement('div'); $wrapper->setAttribute('class','blog-diagram');
+                    $wrapper->setAttribute('tabindex','0'); $wrapper->setAttribute('role','region');
+                    $wrapper->setAttribute('aria-label',t('diagram')); $wrapper->appendChild($fragment);
+                    $pre=$code->parentNode; $pre->parentNode->replaceChild($wrapper,$pre);
+                }
+            } else {
+                $notice=$doc->createElement('p'); $notice->appendChild($doc->createTextNode(t('diagram_unsupported')));
+                $code->parentNode->parentNode->insertBefore($notice,$code->parentNode);
+            }
+            continue;
+        }
+    }
 }

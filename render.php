@@ -18,7 +18,7 @@ function page(string $key,callable $content,?string $error=null,?array $manageme
     echo '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e(t($key)).' · '.e(t('brand')).'</title><link rel="stylesheet" href="/assets/base.css"></head><body><a class="skip" href="#main">'.e(t('skip')).'</a>';
     echo '<header>'.($key==='brand'?'':link_to('/','brand'));
     if ($management) {
-        echo '<p>'.e(t('manage')).' / '.e($management['username']).'</p><nav aria-label="'.e(t('manage')).'">'.link_to('/manage/sections','sections').' '.link_to('/manage/appearance','appearance').' '.link_to('/manage/settings','settings').'</nav><div class="actions">'.link_to('/'.$management['username'],'blog').'<form class="inline" method="post" action="/logout">';token_field();button('logout');echo '</form></div>';
+        echo '<p>'.e(t('manage')).' / '.e($management['username']).'</p><nav aria-label="'.e(t('manage')).'">'.link_to('/manage/sections','sections').' '.link_to('/manage/appearance','appearance').' '.link_to('/manage/settings','settings').' '.link_to('/manage/addons','addons').'</nav><div class="actions">'.link_to('/'.$management['username'],'blog').'<form class="inline" method="post" action="/logout">';token_field();button('logout');echo '</form></div>';
     }
     echo '</header><main id="main"><h1>'.e(t($key)).'</h1>';
     if ($error) echo '<p class="error" role="alert">'.e($error).'</p>';
@@ -46,18 +46,20 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
     if ($blog['description']!=='') echo '<p class="blog-description">'.e($blog['description']).'</p>';
     echo '<nav class="blog-nav" aria-label="'.e(t('sections')).'">'.link_to('/'.$blog['username'],'home').' '.link_to('/'.$blog['username'].'/blogs','blogs');
     foreach (section_list($blog['id']) as $item) echo '<a href="/'.e($blog['username']).'/'.e($item['slug']).'">'.e($item['title']).'</a>';
+    addon_slot('nav',$blog);
     echo '</nav></header>';
     echo '<main class="blog-main" id="main">';
     if ($owner && isset($_SESSION['flash'])) { echo '<p class="feedback" role="status">'.e(t($_SESSION['flash'])).'</p>'; unset($_SESSION['flash']); }
     if ($post) {
-        echo '<article class="blog-post"><h2 class="blog-post-title">'.e($post['title']).'</h2><p><time class="blog-post-date" datetime="'.e($post['published_at'] ?? $post['created_at']).'">'.e(substr($post['published_at'] ?? $post['created_at'],0,10)).'</time>'.($post['status']==='draft'?e(t('draft')):'').'</p><div class="blog-post-body">'.markdown($post['body_markdown']).'</div></article>';
+        echo '<article class="blog-post"><h2 class="blog-post-title">'.e($post['title']).'</h2><p><time class="blog-post-date" datetime="'.e($post['published_at'] ?? $post['created_at']).'">'.e(substr($post['published_at'] ?? $post['created_at'],0,10)).'</time>'.($post['status']==='draft'?e(t('draft')):'').'</p><div class="blog-post-body">'.markdown($post['body_markdown'],$blog).'</div></article>';
+        addon_slot('post_after',$blog,$post);
         if ($owner) { echo '<div class="blog-owner">';icon_link('/'.$blog['username'].'/edit/'.$post['id'],'edit','pencil');icon_link('/'.$blog['username'].'/delete/'.$post['id'],'delete','trash');echo '</div>'; }
     } elseif (!$section && !$feed) {
         echo '<article class="blog-section blog-home"><h2>'.e(t('home'));
         if ($owner) { echo ' ';icon_link('/manage/sections/home','edit_home','pencil'); }
-        echo '</h2>'.markdown($blog['home_markdown']).'</article>';
+        echo '</h2>'.markdown($blog['home_markdown'],$blog).'</article>';
     } else {
-        if ($section) echo '<section class="blog-section"><h2>'.e($section['title']).'</h2>'.markdown($section['content_markdown']).'</section>';
+        if ($section) echo '<section class="blog-section"><h2>'.e($section['title']).'</h2>'.markdown($section['content_markdown'],$blog).'</section>';
         else {
             echo '<h2>'.e(t('blogs'));
             if ($owner) { echo ' ';icon_link('/'.$blog['username'].'/new','new_post','plus'); }
@@ -116,7 +118,7 @@ function manage_sections(array $blog): void {
 }
 function manage_appearance(array $blog,?string $error=null): void {
     page('appearance',function () use ($blog) {
-        echo '<form method="post" action="/manage/appearance">';token_field();area('css','css',value('css',$blog['custom_css'] ?: file_get_contents(dirname(__DIR__).'/public/assets/blog.css')),true);echo '<small>'.e(t('css_help')).'</small><div class="actions">';button('apply');echo link_to('/manage/appearance/restore','restore').'</div></form><h2>'.e(t('preview')).'</h2><iframe title="'.e(t('preview')).'" sandbox="allow-same-origin" src="/'.e($blog['username']).'/preview"></iframe>';
+        echo '<form method="post" action="/manage/appearance">';token_field();area('css','css',value('css',$blog['custom_css'] ?: file_get_contents(__DIR__.'/public/assets/blog.css')),true);echo '<small>'.e(t('css_help')).'</small><div class="actions">';button('apply');echo link_to('/manage/appearance/restore','restore').'</div></form><h2>'.e(t('preview')).'</h2><iframe title="'.e(t('preview')).'" sandbox="allow-same-origin" src="/'.e($blog['username']).'/preview"></iframe>';
     },$error,$blog);
 }
 function manage_settings(array $blog,?string $error=null): void {
@@ -137,5 +139,15 @@ function home_editor(array $blog,?string $error=null): void {
     page('edit_home',function () use ($blog) {
         echo '<form method="post">';token_field();area('content','content',value('content',$blog['home_markdown']));
         echo '<div class="actions">';button('save');echo link_to('/'.$blog['username'],'cancel').'</div></form>';
+    },$error,$blog);
+}
+
+function manage_addons(array $blog,?string $error=null): void {
+    page('addons',function () use ($blog) {
+        $installed=addons();$active=active_addons($blog);
+        if (!$installed) { echo '<p>'.e(t('addons_empty')).'</p>';return; }
+        echo '<form method="post" action="/manage/addons">';token_field();
+        foreach ($installed as $id=>$addon) echo '<p><label><input type="checkbox" name="addons[]" value="'.e($id).'"'.(isset($active[$id])?' checked':'').'> '.e($addon['label']['es']).'</label></p>';
+        echo '<div class="actions">';button('save');echo '</div></form>';
     },$error,$blog);
 }

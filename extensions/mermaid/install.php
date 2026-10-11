@@ -5,7 +5,7 @@ if (PHP_SAPI!=='cli') { http_response_code(404);exit; }
 if (PHP_OS_FAMILY!=='Linux' || php_uname('m')!=='x86_64') {
     fwrite(STDERR,"Install mmdr 0.3.1 for your platform and set BLOG_MERMAID_BIN. See README.md.\n");exit(1);
 }
-$root=dirname(__DIR__);$dir=sys_get_temp_dir().'/blog-renderer-'.bin2hex(random_bytes(8));mkdir($dir,0700);
+$root=__DIR__;$dir=sys_get_temp_dir().'/blog-renderer-'.bin2hex(random_bytes(8));mkdir($dir,0700);
 $exitCode=0;
 try {
     $url='https://github.com/1jehuang/mermaid-rs-renderer/releases/download/v0.3.1/mmdr-x86_64-unknown-linux-gnu.tar.gz';
@@ -16,8 +16,8 @@ try {
     if (!is_resource($process) || proc_close($process)!==0 || !is_file($dir.'/mmdr') || is_link($dir.'/mmdr')) throw new RuntimeException('Extraction failed');
     chmod($dir.'/mmdr',0755);
     // Copy then rename in the destination filesystem for an atomic installation.
-    if (!copy($dir.'/mmdr',$root.'/bin/mmdr.new') || !chmod($root.'/bin/mmdr.new',0755) || !rename($root.'/bin/mmdr.new',$root.'/bin/mmdr')) throw new RuntimeException('Installation failed');
-    echo "mmdr 0.3.1 installed in bin/mmdr.\n";
+    if (!copy($dir.'/mmdr',$root.'/extensions/mermaid/bin/mmdr.new') || !chmod($root.'/extensions/mermaid/bin/mmdr.new',0755) || !rename($root.'/extensions/mermaid/bin/mmdr.new',$root.'/bin/mmdr')) throw new RuntimeException('Installation failed');
+    echo "mmdr 0.3.1 installed in extensions/mermaid/bin/mmdr.\n";
 } catch (Throwable $error) { fwrite(STDERR,$error->getMessage()."\n");$exitCode=1; }
-finally { if (is_file($root.'/bin/mmdr.new')) unlink($root.'/bin/mmdr.new'); foreach (glob($dir.'/*') as $file) unlink($file);rmdir($dir); }
+finally { if (is_file($root.'/extensions/mermaid/bin/mmdr.new')) unlink($root.'/extensions/mermaid/bin/mmdr.new'); foreach (glob($dir.'/*') as $file) unlink($file);rmdir($dir); }
 exit($exitCode);
