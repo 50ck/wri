@@ -3,6 +3,7 @@ body { max-width: 43rem; margin: 4rem auto; padding: 0 1.25rem; background: #171
 a { color: #9fc3e8; text-underline-offset: .2em; }
 a:hover { text-decoration-thickness: 2px; }
 h1 { font-size: 1.8rem; line-height: 1.2; font-weight: 650; margin: 2rem 0 1rem; }
+.manage-title { font-size: 2rem; line-height: 1.2; font-weight: 700; margin: .67em 0 .5rem; }
 h2 { font-size: 1.25rem; margin-top: 2rem; }
 p { margin: 1rem 0; }
 nav, .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin: 1.5rem 0; }

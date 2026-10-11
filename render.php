@@ -24,9 +24,9 @@ function page(string $key,callable $content,?string $error=null,?array $manageme
     foreach ($styles as $id) echo '<link rel="stylesheet" href="/_addons/'.e($id).'/style.css">';
     echo '</head><body><a class="skip" href="#main">'.e(t('skip')).'</a>';
     if ($management) {
-        echo '<header><p>'.e(t('manage')).' / '.e($management['username']).'</p><nav aria-label="'.e(t('manage')).'">'.link_to('/manage/settings','settings').' '.link_to('/manage/sections','sections').' '.link_to('/manage/appearance','appearance').' '.link_to('/manage/addons','addons').'</nav><div class="actions">'.link_to('/'.$management['username'],'blog').'<form class="inline" method="post" action="/logout">';token_field();button('logout');echo '</form></div></header>';
+        echo '<header><h1 class="manage-title">'.e(t('manage')).'</h1><nav aria-label="'.e(t('manage')).'">'.link_to('/manage/settings','settings').' '.link_to('/manage/sections','sections').' '.link_to('/manage/appearance','appearance').' '.link_to('/manage/addons','addons').'</nav><div class="actions">'.link_to('/'.$management['username'],'blog').'<form class="inline" method="post" action="/logout">';token_field();button('logout');echo '</form></div></header>';
     }
-    echo '<main id="main"><h1>'.e(t($key)).'</h1>';
+    echo '<main id="main">'.($management?'<h2>':'<h1>').e(t($key)).($management?'</h2>':'</h1>');
     if ($error) echo '<p class="error" role="alert">'.e($error).'</p>';
     if (isset($_SESSION['flash'])) { echo '<p class="feedback" role="status">'.e(t($_SESSION['flash'])).'</p>'; unset($_SESSION['flash']); }
     $content(); echo '</main></body></html>';
