@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Full front-controller requests with real PDO/file sessions, no network needed."""
-import http.cookiejar, json, os, re, socket, subprocess, sys, tempfile, time, unittest
+import http.cookiejar, json, os, re, shutil, socket, subprocess, sys, tempfile, time, unittest
 import urllib.error, urllib.parse, urllib.request
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,7 +57,14 @@ class Client:
 class Platform(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        global ROOT
         cls.temp = tempfile.TemporaryDirectory(prefix='blog-integration-')
+        cls.original_root=ROOT
+        ROOT=Path(cls.temp.name)/'app'
+        shutil.copytree(cls.original_root,ROOT,ignore=shutil.ignore_patterns('.git','storage','__pycache__'))
+        probe=ROOT/'extensions/probe';probe.mkdir()
+        shutil.copyfile(ROOT/'tests/fixtures/addon.php',probe/'addon.php')
+        (probe/'style.css').write_text('.addon-probe { font-weight: bold; }')
         cls.env = dict(os.environ, BLOG_DATABASE=cls.temp.name+'/test.sqlite', BLOG_SESSION_PATH=cls.temp.name+'/sessions', BLOG_ARGON_MEMORY='8192', BLOG_ARGON_TIME='1')
         subprocess.run(PHP+['install.php'], cwd=ROOT, env=cls.env, check=True, capture_output=True)
         cls.counter = 0
@@ -74,9 +81,11 @@ class Platform(unittest.TestCase):
             else: raise RuntimeError('HTTP test server did not start')
     @classmethod
     def tearDownClass(cls):
+        global ROOT
         if cls.server:
             cls.server.terminate();cls.server.wait(timeout=5);cls.server_log.close()
         cls.temp.cleanup()
+        ROOT=cls.original_root
     def setUp(self):
         if LIVE:
             subprocess.run(PHP+['-r', 'require "app.php"; query("DELETE FROM rate_limits");'],cwd=ROOT,env=self.env,check=True,capture_output=True)
@@ -87,6 +96,72 @@ class Platform(unittest.TestCase):
         self.assertEqual(response['status'],303)
         self.assertEqual(response['location'],'/'+self.name)
         self.visitor = Client(self.env, 'visitor-'+str(self.counter))
+    def test_addons_per_blog_and_privacy(self):
+        response=self.owner.request('/manage/addons')
+        self.assertEqual(response['status'],200)
+        self.assertEqual(response['body'].count(' checked'),3)
+        for name in ('fórmulas','diagramas mermaid','syntax highlighting'):
+            self.assertIn(name,response['body'])
+        self.assertEqual(self.visitor.request('/manage/addons')['status'],401)
+        source='$x^2$\n\n```js\nconst pato = 42;\n```\n\n```mermaid\nflowchart LR; A-->B\n```'
+        self.assertEqual(self.owner.post('/manage/sections/home',content=source)['status'],303)
+        html=self.visitor.request('/'+self.name)['body']
+        self.assertIn('<math ',html);self.assertIn('hljs-',html)
+        self.assertEqual(self.owner.post('/manage/addons',addons=[])['status'],303)
+        html=self.visitor.request('/'+self.name)['body']
+        self.assertNotIn('<math ',html);self.assertNotIn('hljs-',html);self.assertNotIn('<svg',html)
+        self.assertIn('$x^2$',html);self.assertIn('flowchart LR',html)
+        style=self.visitor.request('/'+self.name+'/style.css')['body']
+        self.assertNotIn('.math-block',style);self.assertNotIn('.hljs-',style);self.assertNotIn('.mermaid-',style)
+        self.assertEqual(self.owner.request('/'+self.name+'/_addons/math/ping')['status'],404)
+        self.owner.request('/manage/addons')
+        self.assertEqual(self.owner.post('/manage/addons',addons=['math'])['status'],303)
+        html=self.owner.request('/'+self.name+'/preview')['body']
+        self.assertIn('<math ',html);self.assertNotIn('hljs-',html)
+        other=Client(self.env,'other-addons');other.register('other-addons')
+        other.post('/manage/sections/home',content=source)
+        self.assertIn('hljs-',self.visitor.request('/other-addons')['body'])
+        self.assertEqual(self.owner.request('/manage/addons','POST',{'addons':['math']})['status'],403)
+        self.assertEqual(self.owner.post('/manage/addons',addons=['../../bad'])['status'],422)
+        self.assertEqual(self.owner.post('/manage/addons',addons='math')['status'],422)
+        self.assertEqual(self.owner.request('/manage/addons',method='DELETE')['status'],405)
+        self.owner.post('/manage/settings',title='privado',description='',visibility='private')
+        self.assertEqual(self.visitor.request('/'+self.name+'/style.css')['status'],404)
+        self.assertEqual(self.visitor.request('/'+self.name+'/preview')['status'],404)
+        self.assertEqual(other.request('/'+self.name)['status'],404)
+        self.assertIn('<math ',self.owner.request('/'+self.name+'/preview')['body'])
+
+    def test_addon_contract_routes_slots_and_parser(self):
+        self.owner.request('/manage/addons')
+        self.assertEqual(self.owner.post('/manage/addons',addons=['probe','math'])['status'],303)
+        self.owner.post('/manage/sections/home',content='%probe% $x^2$')
+        html=self.visitor.request('/'+self.name)['body']
+        self.assertIn('<code>PROBE</code>',html);self.assertIn('<math ',html)
+        self.assertIn('class="addon-probe"',html)
+        style=self.visitor.request('/'+self.name+'/style.css')['body']
+        self.assertIn('.addon-probe',style)
+        self.assertNotIn('addon-probe',self.owner.request('/manage/settings')['body'])
+        path='/'+self.name+'/_addons/probe/ping'
+        self.assertEqual(self.visitor.request(path)['status'],200)
+        self.assertEqual(self.visitor.post(path)['status'],200)
+        self.assertEqual(self.visitor.request(path,'POST',{})['status'],403)
+        self.assertEqual(self.visitor.request(path,method='DELETE')['status'],405)
+        self.assertEqual(self.owner.request('/manage/addons/probe/ping')['status'],200)
+        self.assertEqual(self.visitor.request('/manage/addons/probe/ping')['status'],401)
+        self.assertEqual(self.visitor.request('/'+self.name+'/_addons/probe/missing')['status'],404)
+        post=self.create_post(title='Slot probe',body='hola',status='published')
+        self.assertIn('probe post',self.visitor.request(post)['body'])
+        self.owner.request('/manage/settings')
+        self.owner.post('/manage/settings',title='privado',description='',visibility='private')
+        self.assertEqual(self.visitor.request(path)['status'],404)
+        self.assertEqual(self.visitor.post(path)['status'],404)
+        self.assertEqual(self.owner.request(path)['status'],200)
+        self.owner.request('/manage/addons')
+        self.owner.post('/manage/addons',addons=[])
+        self.assertEqual(self.owner.request(path)['status'],404)
+        self.assertEqual(self.owner.request('/manage/addons/probe/ping')['status'],404)
+        self.assertNotIn('addon-probe',self.owner.request('/'+self.name)['body'])
+
     def create_section(self, title='Diario'):
         self.owner.request('/manage/sections/new')
         self.assertEqual(self.owner.post('/manage/sections/new', title=title, content='**introducción**')['status'],303)
