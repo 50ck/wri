@@ -126,6 +126,7 @@ function admin_delete_user(int $id): void {
         $user=admin_user($id);
         if ($id===(int)platform_settings()['admin_user_id']) fail(403,'forbidden');
         update_settings(static function (array &$settings) use($id,$user) {
+            require_admin();if ($id===$settings['admin_user_id']) fail(403,'forbidden');
             query('DELETE FROM users WHERE id=?',[$id]);
             if ($settings['homepage_blog_id']===$user['blog_id']) $settings['homepage_blog_id']=null;
         });
@@ -291,6 +292,7 @@ function delete_account(array $blog,string $password,string $confirmation): void
         $user=one('SELECT * FROM users WHERE id=?',[$blog['user_id']]);
         if (!$user || !password_check($password,$user['password_hash']) || !hash_equals($user['username'],$confirmation)) fail(422,'delete_error');
         update_settings(static function (array &$settings) use($user,$blog) {
+            if ((int)$blog['user_id']===$settings['admin_user_id']) fail(403,'forbidden');
             query('DELETE FROM users WHERE id=?',[$user['id']]);
             if ($settings['homepage_blog_id']===(int)$blog['id']) $settings['homepage_blog_id']=null;
         });

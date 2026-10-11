@@ -72,7 +72,7 @@ function addon_route(?array $blog,string $scope,array $tail): void {
         check_csrf();rate_limit('addon-'.$id,($blog['id']??'platform').':'.($_SERVER['REMOTE_ADDR']??''),30,3600);
     }
     // Admin means global activation, not a privileged audience. Routes remain public
-    // unless a callback requires authentication/ownership; no platform admin role exists.
+    // unless a callback requires authentication/ownership or calls require_admin().
     if (($routes[$_SERVER['REQUEST_METHOD']])(['addon'=>$id,'blog'=>$blog,'path'=>$tail])!==true) fail(404,'not_found');
 }
 function addon_observe_requests(): void {

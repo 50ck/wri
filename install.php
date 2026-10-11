@@ -37,7 +37,7 @@ function migrate(): void {
     });
     if (!is_file(config()['settings_file'])) update_settings(static function (array &$settings) {
         $first=one('SELECT id FROM users ORDER BY id LIMIT 1');
-        if (!$settings['admin_initialized'] && $first) { $settings['admin_user_id']=$first['id'];$settings['admin_initialized']=true; }
+        if (!$settings['admin_initialized'] && ($settings['admin_user_id']!==null || $first)) { $settings['admin_user_id']??=$first['id'];$settings['admin_initialized']=true; }
     });
 }
 
