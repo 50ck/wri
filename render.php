@@ -33,7 +33,6 @@ function auth_form(string $kind,?string $error=null): void {
         field($kind==='register'?'new_password':'password','password','','password');
         if ($kind==='register') { field('confirm_password','confirm_password','','password'); echo '<small>'.e(t('password_help')).'</small>'; }
         echo '<div class="actions">';button($kind);echo '</div></form>';
-        if ($kind==='register') echo '<p>'.link_to('/login','login').'</p>';
     },$error);
 }
 function icon_link(string $path,string $key,string $shape): void {
