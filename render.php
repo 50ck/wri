@@ -13,9 +13,14 @@ function area(string $name,string $key,string $value='',bool $css=false): void {
     echo '<label for="'.e($name).'">'.e(t($key)).'</label><textarea id="'.e($name).'" name="'.e($name).'"'.($css?' class="css-editor" spellcheck="false"':'').'>'.e($value).'</textarea>';
 }
 function button(string $key,?string $name=null,?string $value=null): void { echo '<button type="submit"'.($name?' name="'.e($name).'" value="'.e($value).'"':'').'>'.e(t($key)).'</button>'; }
-function page(string $key,callable $content,?string $error=null,?array $management=null): void {
-    headers_for();
-    echo '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e(t($key)).' · '.e(t('brand')).'</title><link rel="stylesheet" href="/assets/base.css"></head><body><a class="skip" href="#main">'.e(t('skip')).'</a>';
+function page(string $key,callable $content,?string $error=null,?array $management=null,?string $addon=null): void {
+    $styles=$addon===null ? [] : [$addon];
+    if ($key==='brand') foreach (addons('admin') as $id=>$extension) if (isset($extension['slots']['home_after'])) $styles[]=$id;
+    $styles=array_filter(array_unique($styles),static fn($id)=>isset(addons('admin')[$id]['style']));
+    headers_for(addonStyles:$styles);
+    echo '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e(t($key)).' · '.e(t('brand')).'</title><link rel="stylesheet" href="/assets/base.css">';
+    foreach ($styles as $id) echo '<link rel="stylesheet" href="/_addons/'.e($id).'/style.css">';
+    echo '</head><body><a class="skip" href="#main">'.e(t('skip')).'</a>';
     if ($management) {
         echo '<header><p>'.e(t('manage')).' / '.e($management['username']).'</p><nav aria-label="'.e(t('manage')).'">'.link_to('/manage/sections','sections').' '.link_to('/manage/appearance','appearance').' '.link_to('/manage/settings','settings').' '.link_to('/manage/addons','addons').'</nav><div class="actions">'.link_to('/'.$management['username'],'blog').'<form class="inline" method="post" action="/logout">';token_field();button('logout');echo '</form></div></header>';
     }
@@ -143,7 +148,7 @@ function home_editor(array $blog,?string $error=null): void {
 
 function manage_addons(array $blog,?string $error=null): void {
     page('addons',function () use ($blog) {
-        $installed=addons();$active=active_addons($blog);
+        $installed=addons('user');$active=active_addons($blog);
         if (!$installed) { echo '<p>'.e(t('addons_empty')).'</p>';return; }
         echo '<form method="post" action="/manage/addons">';token_field();
         foreach ($installed as $id=>$addon) echo '<p><label><input type="checkbox" name="addons[]" value="'.e($id).'"'.(isset($active[$id])?' checked':'').'> '.e($addon['label']['es']).'</label></p>';

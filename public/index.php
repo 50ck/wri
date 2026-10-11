@@ -8,7 +8,7 @@ function route_index(string $path): void {
             echo '<p>'.e(t('intro')).'</p>';
             echo '<p>'.link_to('/login','login');
             if (config()['registration']) echo ' '.e(t('or')).' '.link_to('/register','sign_up');
-            echo '</p>';
+            echo '</p>';addon_slot('home_after');
         });return;
     }
     if ($path==='/register') {

@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 return [
-    'api'=>1,
+    'api'=>1, 'type'=>'user',
     'label'=>['es'=>'syntax highlighting'],
     'default'=>true,
     'style'=>__DIR__.'/style.css',

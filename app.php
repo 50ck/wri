@@ -107,10 +107,11 @@ function owned_blog(): array {
 }
 function is_owner(array $blog): bool { return (int)($blog['user_id']) === (int)(current_user()['id'] ?? 0); }
 function can_read(array $blog): void { if ($blog['visibility'] === 'private' && !is_owner($blog)) fail(404, 'unavailable'); }
-function headers_for(?array $blog = null, bool $preview = false): void {
+function headers_for(?array $blog = null, bool $preview = false, array $addonStyles = []): void {
     send_header('Cache-Control: no-store, private'); send_header('X-Content-Type-Options: nosniff'); send_header('Referrer-Policy: no-referrer');
     $origin=config()['base_url'];
     $styles = $origin . '/assets/base.css';
+    foreach ($addonStyles as $id) if (isset(addons('admin')[$id]['style'])) $styles.=' '.$origin.'/_addons/'.$id.'/style.css';
     if ($blog) $styles .= ' ' . $origin . '/assets/blog.css ' . $origin . '/' . $blog['username'] . '/style.css';
     $csp="default-src 'none'; script-src 'none'; style-src $styles; img-src 'none'; font-src 'none'; connect-src 'none'; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors " . ($preview ? "'self'" : "'none'");
     if (!$blog) $csp .= "; frame-src $origin";
@@ -267,7 +268,8 @@ function route(): void {
     $path=explode('?',$_SERVER['REQUEST_URI']??'/',2)[0];
     if (strlen($path)>256 || !preg_match('~\A/[a-z0-9/._-]*\z~D',$path) || str_contains($path,'//') || str_contains($path,'..')) fail(404,'not_found');
     if ($path!=='/' && str_ends_with($path,'/')) { methods(['GET']);redirect(rtrim($path,'/'),308); }
-    if ($path==='/manage' || str_starts_with($path,'/manage/')) { require_once __DIR__.'/public/manage.php';route_manage($path); }
+    if ($path==='/_addons' || str_starts_with($path,'/_addons/')) { addon_route(null,'platform',array_slice(explode('/',trim($path,'/')),1)); }
+    elseif ($path==='/manage' || str_starts_with($path,'/manage/')) { require_once __DIR__.'/public/manage.php';route_manage($path); }
     elseif (in_array($path,['/','/register','/login','/logout'],true)) route_index($path);
     else { require_once __DIR__.'/public/blog.php';route_blog($path); }
 }
@@ -275,7 +277,7 @@ function run(): void {
     ini_set('display_errors','0');ini_set('log_errors','1');error_reporting(E_ALL & ~E_DEPRECATED);
     ob_start();
     try {
-        headers_for();
+        addon_observe_requests();headers_for();
         if ((int)($_SERVER['CONTENT_LENGTH']??0)>config()['request_limit'] || strlen(file_get_contents('php://input', false, null, 0, config()['request_limit']+1)) > config()['request_limit']) fail(413,'too_large');
         if ($_SERVER['REQUEST_METHOD']==='POST' && stripos($_SERVER['CONTENT_TYPE']??'','application/x-www-form-urlencoded')!==0) fail(400,'invalid');
         start_session();route();

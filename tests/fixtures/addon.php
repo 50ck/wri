@@ -8,7 +8,7 @@ $route=static function (array $context): bool {
     return true;
 };
 return [
-    'api'=>1,'label'=>['es'=>'prueba del contrato'],
+    'api'=>1, 'type'=>'user','label'=>['es'=>'prueba del contrato'],
     'style'=>__DIR__.'/style.css',
     'parser'=>static function (AddonMarkdown $parser): void {
         $parser->add_inline(['%'],static function ($excerpt) {
