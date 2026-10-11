@@ -199,9 +199,11 @@ class Platform(unittest.TestCase):
         self.assertEqual(self.visitor.request('/available')['status'],404)
         self.assertIn('editar inicio',self.owner.request('/'+self.name)['body'])
     def test_home_and_canonical_paths(self):
-        response=self.visitor.request('/?username=New-Name')
-        self.assertEqual(response['location'],'/register?username=new-name')
-        self.assertEqual(response['status'],303)
+        response=self.visitor.request('/')
+        self.assertEqual(response['status'],200)
+        self.assertNotIn('<form',response['body'])
+        self.assertIn('<a href="/login">entrar</a> o <a href="/register">registrarme</a>',response['body'])
+        self.assertEqual(self.visitor.request('/?username=New-Name')['status'],200)
         self.assertEqual(self.visitor.request('/'+self.name+'/')['status'],308)
         for path in ['/no-such-user','/../storage/blog.sqlite','/assets/../index.php','/'+self.name+'/posts/nope','/a%2fb','//example.org','/health']:
             self.assertEqual(self.visitor.request(path)['status'],404,path)
