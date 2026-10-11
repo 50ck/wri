@@ -68,7 +68,7 @@ Environment variables or a private PHP file specified by `BLOG_CONFIG` configure
 | `BLOG_ARGON_TIME` | `argon_time` | 3 iterations |
 | `BLOG_BCRYPT_COST` | `bcrypt_cost` | 12 |
 
-Keep Nginx `client_max_body_size`, PHP `post_max_size` and the application request limit aligned. URL encoding consumes part of the request budget: a large Unicode body may hit the request cap before the Markdown byte cap. Do not lower password hashing parameters without measuring the deployment's capacity and security needs. Sessions use strict PHP file sessions, HttpOnly, SameSite=Lax and Secure under the configured HTTPS origin. HTTPS cookies use the `__Host-` prefix, with no domain attribute.
+Keep Nginx `client_max_body_size`, PHP `post_max_size` and the application request limit aligned. URL encoding consumes part of the request budget: a large Unicode body may hit the request cap before the Markdown byte cap. Password errors distinguish minimum length, null characters and maximum length. The maximum message counts the characters in the submitted password prefix that fit within the 1024-byte UTF-8 cap. Do not lower password hashing parameters without measuring the deployment's capacity and security needs. Sessions use strict PHP file sessions, HttpOnly, SameSite=Lax and Secure under the configured HTTPS origin. HTTPS cookies use the `__Host-` prefix, with no domain attribute.
 
 Fixed v1 rate limits: registration 5 attempts/IP/hour; login 30 attempts/IP/15 minutes and 10 attempts/normalized username/15 minutes; post creation 30 attempts/account/hour; deletion password reauthentication 10 attempts/account/15 minutes. Failed attempts count. Counters store hashed identities, expire after their window, and are pruned after a day. This is a small local abuse control, not distributed denial-of-service protection.
 
@@ -119,7 +119,7 @@ Primary routes are `/`, `/register`, `/login`, POST `/logout`, `/{username}`, `/
 ./bin/test.sh --http
 ```
 
-The default suite runs 48 core checks and 18 integration scenarios through the real front controller, PDO database and file sessions using a socket-free CLI harness. The concurrency check starts twelve independent PHP processes against one database and requires exactly ten section creations to succeed. The HTTP mode runs the same integration scenarios against the PHP development server using native Python HTTP/cookie handling. Neither mode requires a test framework or frontend dependencies. Test storage is isolated under temporary directories. Test-only Argon2 parameters are reduced for speed.
+The default suite runs 53 core checks and 18 integration scenarios through the real front controller, PDO database and file sessions using a socket-free CLI harness. The concurrency check starts twelve independent PHP processes against one database and requires exactly ten section creations to succeed. The HTTP mode runs the same integration scenarios against the PHP development server using native Python HTTP/cookie handling. Neither mode requires a test framework or frontend dependencies. Test storage is isolated under temporary directories. Test-only Argon2 parameters are reduced for speed.
 
 The implementation environment permitted core/request tests but prohibited opening sockets and did not provide working `doas`, Nginx or PHP-FPM. The HTTP mode, browser presentation/CSP enforcement and Nginx/FPM deployment must therefore be verified on the target server. No browser or production-server test result is claimed.
 
