@@ -19,7 +19,6 @@ small, time { color: #b5b5b5; }
 .inline { display: inline; }
 .inline button { padding: .15rem .5rem; }
 ul { padding-left: 1.4rem; }
-.section-list { list-style: none; padding: 0; }
 .section-list li { margin: 1rem 0; }
 .section-actions { margin-left: .5rem; font-size: .85rem; }
 iframe { width: 100%; height: 30rem; border: 1px solid #888; background: #171717; }
