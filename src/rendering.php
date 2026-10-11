@@ -54,8 +54,9 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
         echo '<article class="blog-post"><h2 class="blog-post-title">'.e($post['title']).'</h2><p><time class="blog-post-date" datetime="'.e($post['published_at'] ?? $post['created_at']).'">'.e(substr($post['published_at'] ?? $post['created_at'],0,10)).'</time>'.($post['status']==='draft'?e(t('draft')):'').'</p><div class="blog-post-body">'.markdown($post['body_markdown']).'</div></article>';
         if ($owner) { echo '<div class="blog-owner">';icon_link('/'.$blog['username'].'/edit/'.$post['id'],'edit','pencil');icon_link('/'.$blog['username'].'/delete/'.$post['id'],'delete','trash');echo '</div>'; }
     } elseif (!$section && !$feed) {
-        echo '<article class="blog-section blog-home"><h2>'.e(t('home')).'</h2>'.markdown($blog['home_markdown']).'</article>';
-        if ($owner) { echo '<div class="blog-owner">';icon_link('/manage/sections/home','edit_home','pencil');echo '</div>'; }
+        echo '<article class="blog-section blog-home"><h2>'.e(t('home'));
+        if ($owner) { echo ' ';icon_link('/manage/sections/home','edit_home','pencil'); }
+        echo '</h2>'.markdown($blog['home_markdown']).'</article>';
     } else {
         if ($section) echo '<section class="blog-section"><h2>'.e($section['title']).'</h2>'.markdown($section['content_markdown']).'</section>';
         else echo '<h2>'.e(t('blogs')).'</h2>';

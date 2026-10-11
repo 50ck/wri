@@ -279,7 +279,7 @@ class Platform(unittest.TestCase):
         self.assertIn('href="/'+self.name+'/blogs">blogs</a>',home['body'])
         self.assertNotIn('blog-post-list',home['body'])
         self.assertNotIn('/manage/sections/home',home['body'])
-        self.assertIn('/manage/sections/home',self.owner.request('/'+self.name)['body'])
+        self.assertRegex(self.owner.request('/'+self.name)['body'],r'<h2>inicio <a href="/manage/sections/home"[^>]*aria-label="editar inicio"[^>]*><svg[^>]*>.*?</svg></a></h2>')
         management=self.owner.request('/manage/sections')['body']
         self.assertIn('inicio',management);self.assertIn('blogs',management)
         self.assertIn('0 de 10',management)
