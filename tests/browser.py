@@ -48,10 +48,11 @@ with tempfile.TemporaryDirectory(prefix='blog-browser-') as folder:
                 # Firefox enforces a 500px minimum desktop window width.
                 browser.command('WebDriver:SetWindowRect',{'width':width,'height':900})
                 browser.command('WebDriver:Navigate',{'url':url})
-                result=browser.evaluate('return {viewport:innerWidth,page:document.documentElement.scrollWidth,links:[...document.querySelectorAll(".blog-main a[href^=\\"#\\"]")].map(a=>({href:a.getAttribute("href"),found:!!document.getElementById(decodeURIComponent(a.hash.slice(1)))})),tables:document.querySelectorAll("table").length,ids:[...document.querySelectorAll("[id]")].map(e=>e.id),codeScrollers:[...document.querySelectorAll("pre")].filter(e=>e.scrollWidth>e.clientWidth).length};')
+                result=browser.evaluate('return {viewport:innerWidth,page:document.documentElement.scrollWidth,links:[...document.querySelectorAll(".blog-main a[href^=\\"#\\"]")].map(a=>({href:a.getAttribute("href"),found:!!document.getElementById(decodeURIComponent(a.hash.slice(1)))})),tables:document.querySelectorAll("table").length,ids:[...document.querySelectorAll("[id]")].map(e=>e.id),diagrams:[...document.querySelectorAll(".mermaid-diagram")].map(s=>({namespace:s.namespaceURI,width:s.getBoundingClientRect().width,height:s.getBoundingClientRect().height,nodes:s.querySelectorAll(".mermaid-node").length,edges:s.querySelectorAll(".mermaid-edge").length})),codeScrollers:[...document.querySelectorAll("pre")].filter(e=>e.scrollWidth>e.clientWidth).length};')
                 assert result['page']<=result['viewport'],result
                 assert all(link['found'] for link in result['links']),result['links']
                 assert len(result['ids'])==len(set(result['ids'])),result['ids']
+                assert all(d['namespace']=='http://www.w3.org/2000/svg' and d['width']>100 and d['height']>50 and d['nodes']>0 for d in result['diagrams']),result['diagrams']
                 print(json.dumps(result,ensure_ascii=False))
             if result['links']:
                 element=browser.command('WebDriver:FindElement',{'using':'css selector','value':'.blog-main a[href^="#"]'})
@@ -61,8 +62,9 @@ with tempfile.TemporaryDirectory(prefix='blog-browser-') as folder:
                 print('Native anchor click:',json.dumps(click,ensure_ascii=False))
             browser.command('WebDriver:SetWindowRect',{'width':500,'height':900})
             browser.command('WebDriver:Navigate',{'url':url})
-            if result['tables']:
-                table=browser.command('WebDriver:FindElement',{'using':'css selector','value':'.blog-table:last-of-type'})
+            target=os.environ.get('BLOG_BROWSER_TARGET') or ('.blog-table:last-of-type' if result['tables'] else None)
+            if target:
+                table=browser.command('WebDriver:FindElement',{'using':'css selector','value':target})
                 browser.command('WebDriver:ElementClick',{'id':table['element-6066-11e4-a52e-4f735466cecf']})
             screenshot=browser.command('WebDriver:TakeScreenshot',{'full':False})
             output=Path(os.environ.get('BLOG_BROWSER_SCREENSHOT','/tmp/blog-browser-audit.png'))

@@ -33,12 +33,12 @@ function mermaid_flowchart(string $source): ?array {
     return $nodes ? ['direction'=>$header[1],'nodes'=>$nodes,'edges'=>$edges] : null;
 }
 function mermaid_node(string $source,int &$offset,array &$nodes): ?string {
-    if (!preg_match('/\G[ \t]*([A-Za-z_][A-Za-z0-9_]{0,63})(?:[ \t]*(?:\[("[^"\n]*"|[^\[\]\n]*)\]|\{("[^"\n]*"|[^{}\n]*)\}|\(("[^"\n]*"|[^()\n]*)\)))?/u',$source,$match,0,$offset)) return null;
+    if (!preg_match('/\G[ \t]*([A-Za-z_][A-Za-z0-9_]{0,63})(?:[ \t]*(?:\[("[^"\n]*"|[^\[\]\n]*)\]|\{("[^"\n]*"|[^{}\n]*)\}|\(("[^"\n]*"|[^()\n]*)\)))?/u',$source,$match,PREG_UNMATCHED_AS_NULL,$offset)) return null;
     $offset+=strlen($match[0]); $id=$match[1];
     if (!isset($nodes[$id]) && count($nodes)>=40) return null;
     $nodes[$id]??=['label'=>$id,'shape'=>'box'];
     foreach ([2=>'box',3=>'diamond',4=>'rounded'] as $index=>$shape) {
-        if (!array_key_exists($index,$match) || $match[$index]==='') continue;
+        if (!array_key_exists($index,$match) || $match[$index]===null) continue;
         $label=trim($match[$index]);
         if (str_starts_with($label,'"') && str_ends_with($label,'"')) $label=substr($label,1,-1);
         if (mb_strlen($label,'UTF-8')>120) return null;
@@ -49,11 +49,11 @@ function mermaid_node(string $source,int &$offset,array &$nodes): ?string {
 function mermaid_lines(string $label,int $limit): array {
     $lines=[]; $line='';
     foreach (preg_split('/\s+/u',trim($label)) as $word) {
-        while (mb_strlen($word,'UTF-8')>$limit) {
+        while (mb_strwidth($word,'UTF-8')>$limit) {
             if ($line!=='') { $lines[]=$line; $line=''; }
-            $lines[]=mb_substr($word,0,$limit,'UTF-8'); $word=mb_substr($word,$limit,null,'UTF-8');
+            $part=mb_strimwidth($word,0,$limit,'','UTF-8'); $lines[]=$part; $word=mb_substr($word,mb_strlen($part,'UTF-8'),null,'UTF-8');
         }
-        if ($line!=='' && mb_strlen($line.' '.$word,'UTF-8')>$limit) { $lines[]=$line; $line=''; }
+        if ($line!=='' && mb_strwidth($line.' '.$word,'UTF-8')>$limit) { $lines[]=$line; $line=''; }
         $line=$line==='' ? $word : $line.' '.$word;
     }
     $lines[]=$line;
@@ -83,7 +83,7 @@ function mermaid_svg(string $source): ?string {
     }
     $groups=[]; $height=96; $width=240;
     foreach ($nodes as $id=>&$node) {
-        $node['lines']=mermaid_lines($node['label'],$node['shape']==='diamond' ? 18 : 26);
+        $node['lines']=mermaid_lines($node['label'],$node['shape']==='diamond' ? 16 : 26);
         $height=max($height,(count($node['lines'])*18+24)*($node['shape']==='diamond' ? 2 : 1));
         $groups[$ranks[$id]][]=$id;
     }
@@ -92,7 +92,7 @@ function mermaid_svg(string $source): ?string {
     $reverse=in_array($graph['direction'],['RL','BT'],true);
     $maxRank=max($ranks); $rows=max(array_map('count',$groups));
     $gap=100;
-    foreach ($edges as $edge) $gap=max($gap,mb_strlen($edge['label'],'UTF-8')*8+24);
+    foreach ($edges as $edge) $gap=max($gap,mb_strwidth($edge['label'],'UTF-8')*9+24);
     $step=($vertical ? $height : $width)+$gap; $cross=($vertical ? $width : $height)+60;
     $backCount=count(array_filter($edges,fn($edge)=>$edge['back']));
     $canvasWidth=64+($vertical ? ($rows-1)*$cross+$width+$backCount*26 : $maxRank*$step+$width);
@@ -134,7 +134,7 @@ function mermaid_svg(string $source): ?string {
         $p1x=$ex-9*$dx+4*$dy; $p1y=$ey-9*$dy-4*$dx; $p2x=$ex-9*$dx-4*$dy; $p2y=$ey-9*$dy+4*$dx;
         $svg.='<path class="mermaid-edge" d="'.$path.'"/><polygon class="mermaid-arrow" points="'.$ex.','.$ey.' '.$p1x.','.$p1y.' '.$p2x.','.$p2y.'"/>';
         if ($edge['label']!=='') {
-            $labelWidth=mb_strlen($edge['label'],'UTF-8')*8+12;
+            $labelWidth=mb_strwidth($edge['label'],'UTF-8')*9+12;
             $labels.='<rect class="mermaid-label-background" x="'.($lx-$labelWidth/2).'" y="'.($ly-12).'" width="'.$labelWidth.'" height="24"/><text class="mermaid-label" x="'.$lx.'" y="'.($ly+5).'">'.$escape($edge['label']).'</text>';
         }
     }
