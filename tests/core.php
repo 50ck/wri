@@ -83,7 +83,7 @@ try {
     save_css($blog,'body {color: red}');check(one('SELECT custom_css FROM blogs WHERE id=?',[$blog['id']])['custom_css']==='body {color: red}','CSS persistence');
     rejects(fn()=>save_css($blog,str_repeat('a',65537)),413);
     $html=markdown("# Título\n\n**fuerte** *suave* `código`\n\n- uno\n- dos\n\n> cita\n\n---\n\n```\n<script>alert(1)</script>\n```\n\n[mal](javascript:alert(1))\n\n![imagen](https://tracker.test/image)\n\n<img src=x onerror=alert(1)>");
-    foreach(['<h1>','<strong>','<em>','<code>','<ul>','<blockquote>','<hr','<pre>'] as $tag)check(str_contains($html,$tag),'Markdown '.$tag);
+    foreach(['<h1','<strong>','<em>','<code>','<ul>','<blockquote>','<hr','<pre>'] as $tag)check(str_contains($html,$tag),'Markdown '.$tag);
     check(!str_contains($html,'<script')&&!str_contains($html,'<img')&&!str_contains($html,'href="javascript:'),'Markdown sanitization');
     check(e('<"&')==='&lt;&quot;&amp;','HTML escaping');
     delete_post($blog,$post);rejects(fn()=>owned_post($blog,$post),404);

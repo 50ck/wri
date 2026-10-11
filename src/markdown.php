@@ -4,23 +4,61 @@ require_once dirname(__DIR__) . '/vendor/parsedown/Parsedown.php';
 function markdown(string $body): string {
     $parser = new Parsedown();
     $html = $parser->setSafeMode(true)->setMarkupEscaped(true)->setUrlsLinked(false)->text($body);
-    // Defense in depth: retain only the small authoring vocabulary. No images/embeds.
+    // Defense in depth: no embeds, resource-loading elements or active attributes.
     $doc = new DOMDocument();
     $previous=libxml_use_internal_errors(true);
     $doc->loadHTML('<?xml encoding="UTF-8"><div id="markdown-root">'.$html.'</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD | LIBXML_NONET);
     libxml_clear_errors(); libxml_use_internal_errors($previous);
-    $allowed=['p','h1','h2','h3','h4','h5','h6','em','strong','a','ul','ol','li','blockquote','pre','code','hr','br','del'];
+    $allowed=['p','h1','h2','h3','h4','h5','h6','em','strong','a','ul','ol','li','blockquote','pre','code','hr','br','del','table','thead','tbody','tr','th','td'];
+    $headings=[]; $tables=[];
     foreach (iterator_to_array($doc->getElementsByTagName('*')) as $node) {
         if ($node->getAttribute('id')==='markdown-root') continue;
+        if ($node->nodeName==='img') {
+            $node->parentNode?->replaceChild($doc->createTextNode($node->getAttribute('alt')), $node);
+            continue;
+        }
         if (!in_array($node->nodeName,$allowed,true)) { $node->parentNode?->removeChild($node); continue; }
+        $alignment=null;
+        if (in_array($node->nodeName,['th','td'],true) && preg_match('/\Atext-align: (left|center|right);\z/', $node->getAttribute('style'), $match)) $alignment=$match[1];
         foreach (iterator_to_array($node->attributes) as $attr) {
+            if ($node->nodeName==='a' && $attr->name==='title') continue;
+            if ($node->nodeName==='ol' && $attr->name==='start' && preg_match('/\A[0-9]{1,9}\z/', $attr->value)) continue;
             if ($node->nodeName==='a' && $attr->name==='href') {
                 $href=trim($attr->value);
                 if (preg_match('~\A(?:https?://|mailto:|/|\#)~i',$href) && !str_starts_with($href,'//') && !preg_match('/[\x00-\x20\\\\]/',$href)) continue;
             }
             $node->removeAttribute($attr->name);
         }
+        if ($alignment) $node->setAttribute('class','markdown-align-'.$alignment);
         if ($node->nodeName==='a') $node->setAttribute('rel','nofollow noreferrer');
+        if (preg_match('/\Ah[1-6]\z/', $node->nodeName)) $headings[]=$node;
+        if ($node->nodeName==='table') $tables[]=$node;
+    }
+    // IDs originate exclusively from escaped heading text, never raw user HTML.
+    $used=['main'=>true,'markdown-root'=>true]; $targets=[];
+    foreach ($headings as $heading) {
+        $base=mb_strtolower(trim($heading->textContent),'UTF-8');
+        $base=preg_replace('/[^\p{L}\p{N}\p{M}_\s-]/u','',$base);
+        $base=preg_replace('/\s+/u','-',$base) ?: 'seccion';
+        $id=$base; $suffix=1;
+        while (isset($used[$id])) $id=$base.'-'.$suffix++;
+        $used[$id]=true; $targets[$base]??=$id; $targets[$id]??=$id;
+        $heading->setAttribute('id',$id);
+    }
+    foreach ($doc->getElementsByTagName('a') as $link) {
+        $href=$link->getAttribute('href');
+        if (str_starts_with($href,'#')) {
+            $target=$targets[rawurldecode(substr($href,1))] ?? null;
+            if ($target) $link->setAttribute('href','#'.rawurlencode($target));
+        }
+    }
+    foreach ($tables as $table) {
+        $wrapper=$doc->createElement('div');
+        $wrapper->setAttribute('class','blog-table');
+        $wrapper->setAttribute('tabindex','0');
+        $wrapper->setAttribute('role','region');
+        $wrapper->setAttribute('aria-label',t('table'));
+        $table->parentNode->replaceChild($wrapper,$table);$wrapper->appendChild($table);
     }
     $root=$doc->getElementById('markdown-root'); $result='';
     if ($root) foreach ($root->childNodes as $child) $result .= $doc->saveHTML($child);
