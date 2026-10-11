@@ -11,8 +11,7 @@ input, textarea, select, button { font: inherit; color: inherit; background: inh
 input:not([type=hidden]):not([type=checkbox]), textarea, select { box-sizing: border-box; width: 100%; padding: .45rem; border: 1px solid #888; border-radius: 0; }
 textarea { min-height: 17rem; resize: vertical; }
 textarea.css-editor { font-family: monospace; min-height: 24rem; }
-button { border: 1px solid #ededed; background: #ededed; color: #171717; padding: .3rem .8rem; cursor: pointer; }
-button:hover { background: #d4d4d4; border-color: #d4d4d4; }
+button { border: 0; background: #242424; color: #ededed; padding: .3rem .8rem; cursor: pointer; }
 :focus-visible { outline: 2px solid #9fc3e8; outline-offset: 3px; }
 small, time { color: #b5b5b5; }
 .error { color: #ffb4b4; }
