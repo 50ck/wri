@@ -65,6 +65,10 @@ class Platform(unittest.TestCase):
         probe=ROOT/'extensions/probe';probe.mkdir()
         shutil.copyfile(ROOT/'tests/fixtures/addon.php',probe/'addon.php')
         (probe/'style.css').write_text('.addon-probe { font-weight: bold; }')
+        for name,fixture in [('admin-probe','admin-addon.php'),('home-probe','home-addon.php')]:
+            folder=ROOT/'extensions'/name;folder.mkdir()
+            shutil.copyfile(ROOT/'tests/fixtures'/fixture,folder/'addon.php')
+            (folder/'style.css').write_text('.'+name+' { font-weight: bold; }')
         cls.env = dict(os.environ, BLOG_DATABASE=cls.temp.name+'/test.sqlite', BLOG_SESSION_PATH=cls.temp.name+'/sessions', BLOG_ARGON_MEMORY='8192', BLOG_ARGON_TIME='1')
         subprocess.run(PHP+['install.php'], cwd=ROOT, env=cls.env, check=True, capture_output=True)
         cls.counter = 0
@@ -96,6 +100,128 @@ class Platform(unittest.TestCase):
         self.assertEqual(response['status'],303)
         self.assertEqual(response['location'],'/'+self.name)
         self.visitor = Client(self.env, 'visitor-'+str(self.counter))
+    def test_admin_addons_global_activation_and_styles(self):
+        home=self.visitor.request('/')
+        self.assertEqual(home['body'].count('admin home'),1)
+        self.assertEqual(home['body'].count('home only'),1)
+        self.assertIn('href="/_addons/admin-probe/style.css"',home['body'])
+        self.assertIn('href="/_addons/home-probe/style.css"',home['body'])
+        csp=next(h for h in home['headers'] if h.startswith('Content-Security-Policy:'))
+        self.assertIn('/_addons/admin-probe/style.css',csp)
+        self.assertIn("script-src 'none'",csp)
+        for path in ['/login','/register','/manage/addons','/manage/settings']:
+            response=self.owner.request(path)
+            self.assertNotIn('admin home',response['body'])
+            self.assertNotIn('home only',response['body'])
+            self.assertNotIn('/_addons/admin-probe/style.css',response['body'])
+            self.assertNotIn('/_addons/home-probe/style.css',response['body'])
+        settings=self.owner.request('/manage/addons')['body']
+        self.assertNotIn('value="admin-probe"',settings)
+        self.assertNotIn('value="home-probe"',settings)
+        self.assertEqual(settings.count(' checked'),3)
+        self.assertEqual(self.owner.post('/manage/addons',addons=['admin-probe'])['status'],422)
+        self.assertEqual(self.owner.post('/manage/addons',addons=[])['status'],303)
+        self.assertEqual(self.owner.post('/manage/sections/home',content='%global% %probe% $x^2$')['status'],303)
+        html=self.visitor.request('/'+self.name)['body']
+        self.assertIn('<code>GLOBAL</code>',html)
+        self.assertIn('%probe%',html);self.assertNotIn('<math ',html)
+        self.assertIn('class="admin-probe"',html)
+        self.assertNotIn('home only',html)
+        style=self.visitor.request('/'+self.name+'/style.css')['body']
+        self.assertIn('.admin-probe',style);self.assertNotIn('.home-probe',style)
+        self.assertNotIn('.math-block',style)
+        with __import__('sqlite3').connect(self.env['BLOG_DATABASE']) as database:
+            self.assertEqual(database.execute("SELECT count(*) FROM blog_addons WHERE addon_id IN ('admin-probe','home-probe')").fetchone()[0],0)
+        for path in ['/_addons/admin-probe/style.css','/_addons/home-probe/style.css']:
+            response=self.visitor.request(path)
+            self.assertEqual(response['status'],200)
+            self.assertIn('Content-Type: text/css; charset=utf-8',response['headers'])
+            self.assertEqual(self.visitor.request(path,method='POST')['status'],405)
+        self.assertEqual(self.visitor.request('/_addons/math/style.css')['status'],404)
+        self.assertEqual(self.visitor.request('/_addons/probe/ping')['status'],404)
+        self.assertEqual(self.visitor.request('/_addons/admin-probe/unknown')['status'],404)
+        self.assertEqual(self.visitor.request('/_addons')['status'],404)
+        folder=ROOT/'extensions/admin-probe';removed=ROOT/'admin-removed'
+        folder.rename(removed)
+        try:
+            self.assertNotIn('admin home',self.visitor.request('/')['body'])
+            self.assertNotIn('admin-probe',self.visitor.request('/'+self.name+'/style.css')['body'])
+            self.assertEqual(self.visitor.request('/_addons/admin-probe/ping')['status'],404)
+        finally:
+            removed.rename(folder)
+        self.assertIn('admin home',self.visitor.request('/')['body'])
+
+    def test_admin_addon_routes_csrf_rate_and_blog_privacy(self):
+        path='/_addons/admin-probe/ping'
+        response=self.visitor.request(path)
+        self.assertEqual(response['status'],200)
+        self.assertIn('/_addons/admin-probe/style.css',response['body'])
+        self.assertNotIn('/_addons/home-probe/style.css',response['body'])
+        self.assertEqual(self.visitor.post(path)['status'],200)
+        self.assertEqual(self.visitor.request(path,'POST',{})['status'],403)
+        self.assertEqual(self.visitor.request(path,method='DELETE')['status'],405)
+        for _ in range(29): self.assertEqual(self.visitor.post(path)['status'],200)
+        self.assertEqual(self.visitor.post(path)['status'],429)
+        blogPath='/'+self.name+'/_addons/admin-probe/ping'
+        self.assertEqual(self.visitor.request(blogPath)['status'],200)
+        self.assertEqual(self.visitor.request('/manage/addons/admin-probe/ping')['status'],401)
+        self.assertEqual(self.owner.request('/manage/addons/admin-probe/ping')['status'],200)
+        self.owner.request('/manage/addons');self.owner.post('/manage/addons',addons=[])
+        self.assertEqual(self.owner.request('/manage/addons/admin-probe/ping')['status'],200)
+        url=self.create_post(title='Global slot')
+        self.assertIn('admin global post',self.visitor.request(url)['body'])
+        self.owner.request('/manage/settings')
+        self.owner.post('/manage/settings',title='privado',description='',visibility='private')
+        self.assertEqual(self.visitor.request(blogPath)['status'],404)
+        self.assertEqual(self.owner.request(blogPath)['status'],200)
+        self.assertEqual(self.visitor.request(path)['status'],200)
+
+    def test_admin_request_observer_results_and_output(self):
+        path='/_addons/admin-probe/redirect'
+        response=self.visitor.request(path)
+        self.assertEqual(response['status'],303)
+        self.assertEqual(response['location'],'/')
+        self.assertNotIn('OBSERVER OUTPUT',response['body'])
+        def events():
+            return [json.loads(line) for line in Path(self.env['BLOG_DATABASE']+'.observations').read_text().splitlines()]
+        self.assertEqual(events()[-1]['status'],303)
+        self.assertEqual(events()[-1]['path'],path)
+        for path,status in [('/login?password=secret-query',200),('/missing-global-page',404),('/login',405)]:
+            result=self.visitor.request(path,method='DELETE' if status==405 else 'GET')
+            self.assertEqual(result['status'],status)
+            event=events()[-1]
+            self.assertEqual(event['status'],status)
+            self.assertEqual(event['path'],path.split('?')[0])
+            self.assertEqual(set(event),{'path','method','status','duration_ms'})
+            self.assertGreaterEqual(event['duration_ms'],0)
+            self.assertNotIn('secret-query',json.dumps(event))
+            self.assertNotIn('OBSERVER OUTPUT',result['body'])
+        self.visitor.request('/login');self.visitor.post('/login',username='missing-user',password='never-record-this')
+        self.assertEqual(events()[-1]['status'],422)
+        self.assertNotIn('never-record-this',Path(self.env['BLOG_DATABASE']+'.observations').read_text())
+        if LIVE: return # Failure logging is inspected in the CLI harness below.
+        errorLog=ROOT/'observer-error.log'
+        result=subprocess.run(PHP+['-d','error_log='+str(errorLog),'tests/request.php'],cwd=ROOT,env=self.env,input=json.dumps(dict(path='/_addons/admin-probe/observer-error',method='GET',data={})),text=True,capture_output=True,check=True)
+        response=json.loads(result.stdout)
+        self.assertEqual(response['status'],200)
+        self.assertNotIn('OBSERVER OUTPUT',response['body'])
+        self.assertIn('Addon observer failed: admin-probe',errorLog.read_text())
+        self.assertEqual(json.loads(Path(self.env['BLOG_DATABASE']+'.secondary-observations').read_text().splitlines()[-1])['path'],'/_addons/admin-probe/observer-error')
+
+    def test_addon_type_validation(self):
+        if LIVE: self.skipTest('Descriptor rejection logging is checked in the CLI harness')
+        bad=ROOT/'extensions/bad-type';bad.mkdir()
+        errorLog=ROOT/'addon-validation.log'
+        variants=["'scope'=>'admin'", "'type'=>'unknown'", "'type'=>'user','slots'=>['home_after'=>static function() {}]", "'type'=>'user','request_finished'=>static function() {}", "'type'=>'user','routes'=>['platform'=>['GET'=>static function() {}]]"]
+        try:
+            for variant in variants:
+                (bad/'addon.php').write_text("<?php return ['api'=>1,'label'=>['es'=>'invalid addon'],"+variant+"]; ")
+                result=subprocess.run(PHP+['-d','error_log='+str(errorLog),'tests/request.php'],cwd=ROOT,env=self.env,input=json.dumps(dict(path='/',method='GET',data={})),text=True,capture_output=True,check=True)
+                self.assertEqual(json.loads(result.stdout)['status'],200)
+            self.assertEqual(errorLog.read_text().count('Addon unavailable: bad-type'),len(variants))
+        finally:
+            shutil.rmtree(bad)
+
     def test_addons_per_blog_and_privacy(self):
         response=self.owner.request('/manage/addons')
         self.assertEqual(response['status'],200)
