@@ -107,15 +107,13 @@ function owned_blog(): array {
 }
 function is_owner(array $blog): bool { return (int)($blog['user_id']) === (int)(current_user()['id'] ?? 0); }
 function can_read(array $blog): void { if ($blog['visibility'] === 'private' && !is_owner($blog)) fail(404, 'unavailable'); }
-function headers_for(?array $blog = null, bool $preview = false, array $addonStyles = [], array $images = []): void {
+function headers_for(?array $blog = null, bool $preview = false, array $addonStyles = []): void {
     send_header('Cache-Control: no-store, private'); send_header('X-Content-Type-Options: nosniff'); send_header('Referrer-Policy: no-referrer');
     $origin=config()['base_url'];
     $styles = $origin . '/assets/base.css';
     foreach ($addonStyles as $id) if (isset(addons('admin')[$id]['style'])) $styles.=' '.$origin.'/_addons/'.$id.'/style.css';
     if ($blog) $styles .= ' ' . $origin . '/assets/blog.css ' . $origin . '/' . $blog['username'] . '/style.css';
-    $imageSources=[];
-    if ($blog) foreach ($images as $url) if (markdown_image_url($url)!==null) $imageSources[]=explode('?',explode('#',$url,2)[0],2)[0];
-    $imagePolicy=$imageSources ? implode(' ',array_unique($imageSources)) : "'none'";
+    $imagePolicy=$blog ? 'https:' : "'none'";
     $csp="default-src 'none'; script-src 'none'; style-src $styles; img-src $imagePolicy; font-src 'none'; connect-src 'none'; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors " . ($preview ? "'self'" : "'none'");
     if (!$blog) $csp .= "; frame-src $origin";
     else $csp .= "; sandbox allow-same-origin" . ($preview ? '' : ' allow-top-navigation-by-user-activation');

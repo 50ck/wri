@@ -48,13 +48,8 @@ function icon_link(string $path,string $key,string $shape): void {
 }
 function render_blog(array $blog,?array $section=null,?array $post=null,bool $preview=false,bool $feed=false): void {
     $body=$post ? $post['body_markdown'] : ($section ? $section['content_markdown'] : ($feed ? '' : $blog['home_markdown']));
-    $html=markdown($body,$blog); $images=[];
-    if (str_contains($html,'<img')) {
-        $doc=new DOMDocument(); $previous=libxml_use_internal_errors(true);
-        $doc->loadHTML('<?xml encoding="UTF-8">'.$html,LIBXML_NONET); libxml_clear_errors(); libxml_use_internal_errors($previous);
-        foreach ($doc->getElementsByTagName('img') as $image) $images[]=$image->getAttribute('src');
-    }
-    headers_for($blog,$preview,images:$images); $owner=is_owner($blog) && !$preview;
+    $html=markdown($body,$blog);
+    headers_for($blog,$preview); $owner=is_owner($blog) && !$preview;
     echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e(($post['title'] ?? $section['title'] ?? $blog['title'])).'</title><link rel="stylesheet" href="/'.e($blog['username']).'/style.css"></head><body class="blog"><header class="blog-header"><h1 class="blog-title"><a href="/'.e($blog['username']).'">'.e($blog['title']).'</a></h1>';
     if ($blog['description']!=='') echo '<p class="blog-description">'.e($blog['description']).'</p>';
     echo '<nav class="blog-nav" aria-label="'.e(t('sections')).'">'.link_to('/'.$blog['username'],'home').' '.link_to('/'.$blog['username'].'/blogs','blogs');
