@@ -10,3 +10,4 @@ fi
 python3 tests/integration.py "$@"
 find public src bin tests config database -name '*.php' -exec php -l '{}' \;
 php -l vendor/parsedown/Parsedown.php
+find vendor/highlight -name '*.php' -exec php -l '{}' \;
