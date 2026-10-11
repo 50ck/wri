@@ -172,9 +172,9 @@ function manage_admin(array $blog,?string $error=null): void {
         $more=count($users)>50;echo '<ul class="section-list">';
         foreach (array_slice($users,0,50) as $user) {
             echo '<li><a href="/'.e($user['username']).'">'.e($user['username']).'</a>';
-            if ($user['visibility']==='public') {
+            if ($user['visibility']==='public' && (int)$user['id']!==(int)$home) {
                 echo ' <span class="section-actions">'.link_to('/manage/admin/homepage?blog_id='.$user['id'],'use_blog_home').'</span>';
-            } else echo ' <span class="section-actions">'.e(t('private')).'</span>';
+            } elseif ($user['visibility']==='private') echo ' <span class="section-actions">'.e(t('private')).'</span>';
             echo '</li>';
         }
         echo '</ul><nav>';
