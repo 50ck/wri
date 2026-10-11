@@ -3,7 +3,7 @@ declare(strict_types=1);
 $dir=sys_get_temp_dir().'/blog-core-'.bin2hex(random_bytes(6));mkdir($dir,0700);
 putenv('BLOG_MERMAID_BIN=/nonexistent');
 putenv('BLOG_DATABASE='.$dir.'/test.sqlite');putenv('BLOG_ARGON_MEMORY=8192');putenv('BLOG_ARGON_TIME=1');
-require dirname(__DIR__).'/app.php';
+require dirname(__DIR__).'/install.php';
 function test_markdown(string $body): string { return markdown($body,$GLOBALS['blog']); }
 $checks=0;
 function check(bool $ok,string $label): void { global $checks;if (!$ok) throw new RuntimeException($label);$checks++; }
