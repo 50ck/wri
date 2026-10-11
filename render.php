@@ -165,8 +165,9 @@ function manage_addons(array $blog,?string $error=null): void {
 function manage_admin(array $blog,?string $error=null): void {
     page('admin',function () {
         $platform=platform_settings();$home=$platform['homepage_blog_id'];
-        echo '<p>'.link_to('/manage/admin/signups?enabled='.($platform['allow_signups']?'0':'1'),$platform['allow_signups']?'close_signups':'allow_signups').'</p>';
-        if ($home!==null) echo '<p>'.link_to('/manage/admin/homepage','use_platform_home').'</p>';
+        echo '<ul class="section-list"><li>'.link_to('/manage/admin/signups?enabled='.($platform['allow_signups']?'0':'1'),$platform['allow_signups']?'close_signups':'allow_signups').'</li>';
+        if ($home!==null) echo '<li>'.link_to('/manage/admin/homepage','use_platform_home').'</li>';
+        echo '</ul>';
         echo '<h3>'.e(t('users')).'</h3>';
         $number=input('page',$_GET);
         if ($number!=='' && (!ctype_digit($number) || (int)$number<1 || (int)$number>10000)) fail(400,'invalid');
