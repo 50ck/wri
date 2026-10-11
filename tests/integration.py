@@ -419,6 +419,14 @@ class Platform(unittest.TestCase):
         self.assertNotIn('/'+self.name+'/style.css',self.owner.request('/login')['body'])
     def test_disabled_registration_and_configured_post_cap(self):
         if LIVE: self.skipTest('Configuration variations are exercised by the CLI request harness')
+        customized=Client(dict(self.env,BLOG_SITE_NAME='Mi blog <&>',BLOG_SITE_DESCRIPTION='Escribir <sin ruido>'),'customized')
+        body=customized.request('/')['body']
+        self.assertIn('<h1>Mi blog &lt;&amp;&gt;</h1>',body)
+        self.assertIn('<p>Escribir &lt;sin ruido&gt;</p>',body)
+        self.assertNotIn('localhost/',body)
+        self.assertNotIn('href="/register"',customized.request('/login')['body'])
+        self.assertNotIn('3–24',customized.request('/login')['body'])
+        self.assertIn('3–24',customized.request('/register')['body'])
         disabled=Client(dict(self.env,BLOG_REGISTRATION='0'),'disabled')
         self.assertEqual(disabled.request('/register')['status'],403)
         self.assertNotIn('name="username"',disabled.request('/')['body'])
@@ -437,5 +445,6 @@ class Platform(unittest.TestCase):
             body=self.owner.request(path)['body']
             self.assertNotRegex(body,r'<script\b|\bon\w+\s*=|javascript:')
             self.assertIn('<html lang="es">',body)
+            self.assertNotIn('>blogs.</a>',body)
 
 if __name__=='__main__': unittest.main(verbosity=2)
