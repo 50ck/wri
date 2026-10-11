@@ -14,9 +14,8 @@ function route_manage(string $path): void {
                     redirect('/manage/admin',303,'saved');
                 });admin_user_editor($blog,$user,$error);return;
             }
-            $error=submitted(function () use($user,$self) {
+            $error=submitted(function () use($user) {
                 admin_delete_user($user['id'],input('password'),input('confirmation'));
-                if ($self) {logout();redirect('/');}
                 redirect('/manage/admin',303,'deleted');
             });admin_user_delete($blog,$user,$error);return;
         }

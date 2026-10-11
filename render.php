@@ -163,7 +163,7 @@ function manage_addons(array $blog,?string $error=null): void {
 
 function manage_admin(array $blog,?string $error=null): void {
     page('admin',function () {
-        $home=platform_settings()['homepage_blog_id'];
+        $platform=platform_settings();$home=$platform['homepage_blog_id'];
         if ($home!==null) echo '<p>'.link_to('/manage/admin/homepage','use_platform_home').'</p>';
         echo '<h3>'.e(t('users')).'</h3>';
         $number=input('page',$_GET);
@@ -174,8 +174,8 @@ function manage_admin(array $blog,?string $error=null): void {
         foreach (array_slice($users,0,50) as $user) {
             echo '<li><a href="/'.e($user['username']).'">'.e($user['username']).'</a>';
             echo ' <span class="section-actions">';
-            icon_link('/manage/admin/users/'.$user['user_id'].'/edit','edit','pencil');echo ' ';
-            if ((int)$user['user_id']!==(int)platform_settings()['admin_user_id']) { echo ' ';icon_link('/manage/admin/users/'.$user['user_id'].'/delete','delete','trash'); }
+            icon_link('/manage/admin/users/'.$user['user_id'].'/edit','edit','pencil');
+            if ((int)$user['user_id']!==(int)$platform['admin_user_id']) { echo ' ';icon_link('/manage/admin/users/'.$user['user_id'].'/delete','delete','trash'); }
             if ($user['visibility']==='public' && (int)$user['id']!==(int)$home) {
                 echo ' '.link_to('/manage/admin/homepage?blog_id='.$user['id'],'use_blog_home');
             } elseif ($user['visibility']==='private') echo ' '.e(t('private'));
