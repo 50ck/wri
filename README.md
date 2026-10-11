@@ -152,7 +152,7 @@ python3 tests/browser.py http://localhost:8080/avz
 
 It opens an isolated temporary Firefox profile with website JavaScript disabled, checks column overflow and internal anchors at three widths, performs a native link click, and writes a screenshot to `/tmp/blog-browser-audit.png`. Marionette is used only for test instrumentation, following the [Mozilla protocol](https://firefox-source-docs.mozilla.org/remote/marionette/Protocol.html). The temporary browser/profile are removed afterward.
 
-The default suite runs 161 core checks when the native renderer is installed (native-corpus checks are explicitly skipped otherwise) and 19 integration scenarios through the real front controller, PDO database and file sessions using a socket-free CLI harness. The concurrency check starts twelve independent PHP processes against one database and requires exactly ten section creations to succeed. The HTTP mode runs the same integration scenarios against the PHP development server using native Python HTTP/cookie handling. Neither mode requires a test framework or frontend dependencies. Test storage is isolated under temporary directories. Test-only Argon2 parameters are reduced for speed.
+The default suite runs 161 core checks when the native renderer is installed (native-corpus checks are explicitly skipped otherwise) and 22 integration scenarios through the real front controller, PDO database and file sessions using a socket-free CLI harness. The concurrency check starts twelve independent PHP processes against one database and requires exactly ten section creations to succeed. The HTTP mode runs the same integration scenarios against the PHP development server using native Python HTTP/cookie handling. Neither mode requires a test framework or frontend dependencies. Test storage is isolated under temporary directories. Test-only Argon2 parameters are reduced for speed.
 
 Core/request tests, local HTTP integration tests and a Firefox layout/anchor audit with website JavaScript disabled have been executed. Local sockets require execution outside the restricted sandbox. Working `doas`, Nginx and PHP-FPM were unavailable in that environment. The browser audit checked /avz and both stress posts at 500, 768 and 1280 pixels, with all 44 formulas rendered and all ten native diagrams fitting their containers without horizontal scrolling: no page-wide horizontal overflow, all internal heading links resolved, and a native click reached its heading. Complete CSP enforcement and Nginx/FPM deployment still need verification on the target server; no production-server test result is claimed.
 
@@ -173,3 +173,36 @@ Deletion does **not** erase already taken backups. Set and communicate a finite 
 ## Deliberate limits
 
 One blog/account; ten sections; no username changes, custom HTML/JavaScript, media, comments, RSS, API or email recovery. No CSS revision history, static export or shared page cache. Source strings are centralized in `config.php`. Private blogs are owner-only and share the same backend authorization on all endpoints. Previously viewed or downloaded public content cannot be recalled from visitors when privacy changes. SQLite serializes writes; tune PHP-FPM capacity and hash cost for the actual machine before opening public registration.
+
+## Addons and compact layout
+
+Runtime code is eight PHP files: `public/index.php`, `public/blog.php`, `public/manage.php`, `app.php`, `config.php`, `render.php`, `markdown.php` and `addons.php`. The internal front controller dispatches to the blog and management controllers; arbitrary PHP URLs remain blocked. `install.php` contains the versioned schema migrations through `app.php`; there is no separate migration directory. `tests/`, `bin/test.sh` and the deployment examples under `config/` are development/deployment material and can be omitted from a production release. Keep `bin/dev-router.php` only for the local development server.
+
+`extensions/math`, `extensions/mermaid` and `extensions/highlight` each contain their descriptor, rendering code, stylesheet and dependencies. There is no handwritten Mermaid fallback: the optional native executable handles diagrams, or escaped source remains visible. Disabled math is ordinary Markdown; disabled highlighting is plain code. All source is retained in the database. Upgrading with `php install.php` enables the shipped addons for existing blogs; new blogs use each descriptor's `default` flag. Later additions do not silently activate themselves on existing blogs.
+
+Owners choose enabled addons at `/manage/addons` with native checkboxes and a CSRF-protected POST. Selection is stored in `blog_addons(blog_id, addon_id)` with an account-deletion cascade. Selection affects homepage, sections, posts and preview. Enabled addon styles are prepended to the blog's protected `style.css` response, so custom CSS can override them. They never enter authentication, management or editor pages. Their resources stay outside the document root.
+
+To create an addon, place `addon.php` inside `extensions/<id>/`. IDs must match `[a-z][a-z0-9-]{0,31}`. The descriptor returns a PHP array:
+
+```php
+<?php
+return [
+    'api' => 1,
+    'label' => ['es' => 'nombre del addon'],
+    'default' => false,
+    // 'style' => __DIR__.'/style.css',
+    // Optional callbacks documented below.
+];
+```
+
+The registry discovers descriptors on each request and validates their API and callbacks. Keep descriptors cheap; load libraries with `require_once` inside their callbacks. No upload interface, package manager, remote discovery or client-side code is involved. Missing addons disappear from the checklist and cannot run. Their saved activation rows remain until the owner saves a new selection, so restoring a folder before that restores its activation. Disabling or removing a folder does not delete future addon content.
+
+The three integration points are:
+
+* **Markdown:** `parser(AddonMarkdown $parser): void` registers rules before parsing through `add_inline(array $markers, callable $callback)` and `add_block(array $markers, callable $start, ?callable $continue, ?callable $complete)`. Callbacks return native Parsedown rule arrays, or `null` when they do not match. `render(DOMDocument $doc, array $context): void` transforms the sanitized document afterward; `$context['blog']` supplies the blog. Safe `language-*` fence classes and `addon-*` code markers survive until these callbacks finish, then are removed. The shipped addons demonstrate both approaches. Each addon must sanitize any new markup it generates and bound its resource use; core sanitization cannot validate arbitrary addon output.
+* **Routes:** `routes['public']['GET'|'POST']` receives `['blog'=>$blog, 'path'=>$segments]` for `/{username}/_addons/<id>/<path>`. `routes['manage'][...]` receives the same context under `/manage/addons/<id>/<path>`. Return `true` after handling a path, `false` for 404. Core checks enabled status, privacy, management ownership, allowed methods and POST CSRF/rate limits first. Callbacks must validate their own inputs and target post/section ownership through stable IDs; public routes must also check draft visibility when referencing posts. Use `page()` and native forms for submissions, keeping tokens outside customizable blog HTML. Successful mutations must use `redirect()` (303).
+* **Render locations:** `slots['nav'](array $context): void` adds navigation content; `slots['post_after'](...)` adds content after an article. Context contains `blog` and `post` (null for navigation). Output must be escaped and free of privileged forms or secrets; blog CSP still blocks forms and scripts. Slots also render in owner previews, subject to the same sandbox.
+
+A future guestbook or comments addon can use these routes and slots, but neither feature is implemented. Add schema changes to an explicit CLI installation procedure when an addon first needs storage; never migrate on page views. Addon rows must reference `blogs.id` with cascading deletion, and their queries must scope data to that blog. Do not place private files under `public/`.
+
+**Trust boundary:** addons are trusted server-side PHP installed by the operator, not sandboxed code supplied by blog owners. The application does not isolate PHP extensions from each other or from the database. Keep all extension code, styles and executables owned by the deployer and non-writable by PHP-FPM. The checklist grants use of installed functionality, never permission to install executable code.
