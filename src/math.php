@@ -51,7 +51,7 @@ class MathMarkdown extends Parsedown {
 function math_element(DOMDocument $doc,string $tex,string $display): ?DOMElement {
     if (strlen($tex)>4096 || trim($tex)==='' || !mb_check_encoding($tex,'UTF-8') || preg_match('/[\x00-\x08\x0b\x0c\x0e-\x1f]/',$tex)) return null;
     $depth=0;
-    foreach (str_split($tex) as $char) { if ($char==='{') $depth++; elseif ($char==='}') $depth--; if ($depth>48 || $depth<0) return null; }
+    for ($i=0;$i<strlen($tex);$i++) { $char=$tex[$i];if ($char==='\\') { $i++;continue; } if ($char==='{') $depth++; elseif ($char==='}') $depth--; if ($depth>48 || $depth<0) return null; }
     if ($depth!==0) return null;
     static $loaded=false;
     if (!$loaded) {

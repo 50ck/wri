@@ -104,8 +104,10 @@ class Converter
 
         foreach ($nodes as $node) {
             if ($node->token === Commands::BRACES) {
-                $currentRow[] = [$node];
-                $row_hfil_indexes[] = [false];
+                $currentRow[$col_index] ??= [];
+                $row_hfil_indexes[$col_index] ??= [];
+                $currentRow[$col_index][] = $node;
+                $row_hfil_indexes[$col_index][] = false;
             } elseif ($node->token === "&") {
                 $col_index++;
                 if (!isset($currentRow[$col_index])) {
@@ -114,14 +116,15 @@ class Converter
                 }
             } elseif ($node->token === Commands::DOUBLEBACKSLASH || $node->token === Commands::CARRIAGE_RETURN || $node->token === '\\\\') {
                 $rows[] = [$currentRow, $row_hfil_indexes];
+                $row_lines[] = "none";
                 if ($col_index + 1 > $max_col_size) $max_col_size = $col_index + 1;
                 $currentRow = [];
                 $row_hfil_indexes = [];
                 $col_index = 0;
             } elseif ($node->token === Commands::HLINE) {
-                $row_lines[] = "solid";
+                $row_lines[max(0, count($rows) - 1)] = "solid";
             } elseif ($node->token === Commands::HDASHLINE) {
-                $row_lines[] = "dashed";
+                $row_lines[max(0, count($rows) - 1)] = "dashed";
             } elseif ($node->token === Commands::HFIL) {
                 if (!isset($row_hfil_indexes[$col_index])) $row_hfil_indexes[$col_index] = [];
                 $row_hfil_indexes[$col_index][] = true;
@@ -137,7 +140,7 @@ class Converter
             if ($col_index + 1 > $max_col_size) $max_col_size = $col_index + 1;
         }
 
-        if (in_array("solid", $row_lines)) {
+        if (in_array("solid", $row_lines) || in_array("dashed", $row_lines)) {
             $parent->setAttribute("rowlines", implode(" ", $row_lines));
         }
 
