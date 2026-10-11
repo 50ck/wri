@@ -126,7 +126,7 @@ function manage_sections(array $blog): void {
 }
 function manage_appearance(array $blog,?string $error=null): void {
     page('appearance',function () use ($blog) {
-        echo '<form method="post" action="/manage/appearance">';token_field();area('css','css',value('css',$blog['custom_css'] ?: file_get_contents(__DIR__.'/public/assets/blog.css')),true);echo '<small>'.e(t('css_help')).'</small><div class="actions">';button('apply');echo link_to('/manage/appearance/restore','restore').'</div></form><h2>'.e(t('preview')).'</h2><iframe title="'.e(t('preview')).'" sandbox="allow-same-origin" src="/'.e($blog['username']).'/preview"></iframe>';
+        echo '<form method="post" action="/manage/appearance">';token_field();area('css','css',value('css',$blog['custom_css'] ?: file_get_contents(__DIR__.'/public/assets/blog.css')),true);echo '<div class="actions">';button('apply');echo link_to('/manage/appearance/restore','restore').'</div></form><h2>'.e(t('preview')).'</h2><iframe title="'.e(t('preview')).'" sandbox="allow-same-origin" src="/'.e($blog['username']).'/preview"></iframe>';
     },$error,$blog);
 }
 function manage_settings(array $blog,?string $error=null): void {
