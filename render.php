@@ -164,8 +164,7 @@ function manage_admin(array $blog,?string $error=null): void {
     page('admin',function () {
         $home=platform_settings()['homepage_blog_id'];
         $selected=$home===null ? null : one('SELECT u.username FROM blogs b JOIN users u ON u.id=b.user_id WHERE b.id=?',[$home]);
-        echo '<h3>'.e(t('homepage')).'</h3><p>'.e($selected['username']??t('platform_home')).'</p><form method="post">';
-        token_field();echo '<input type="hidden" name="blog_id" value="">';button('use_platform_home');echo '</form><h3>'.e(t('users')).'</h3>';
+        echo '<h3>'.e(t('homepage')).'</h3><p>'.e($selected['username']??t('platform_home')).' <span class="section-actions">'.link_to('/manage/admin/homepage','use_platform_home').'</span></p><h3>'.e(t('users')).'</h3>';
         $number=input('page',$_GET);
         if ($number!=='' && (!ctype_digit($number) || (int)$number<1 || (int)$number>10000)) fail(400,'invalid');
         $page=max(1,(int)$number);
@@ -174,7 +173,7 @@ function manage_admin(array $blog,?string $error=null): void {
         foreach (array_slice($users,0,50) as $user) {
             echo '<li><a href="/'.e($user['username']).'">'.e($user['username']).'</a>';
             if ($user['visibility']==='public') {
-                echo ' <form class="inline" method="post">';token_field();echo '<input type="hidden" name="blog_id" value="'.$user['id'].'">';button('use_blog_home');echo '</form>';
+                echo ' <span class="section-actions">'.link_to('/manage/admin/homepage?blog_id='.$user['id'],'use_blog_home').'</span>';
             } else echo ' <span class="section-actions">'.e(t('private')).'</span>';
             echo '</li>';
         }

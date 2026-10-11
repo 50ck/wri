@@ -4,6 +4,14 @@ function route_manage(string $path): void {
     if ($path==='/manage' || str_starts_with($path,'/manage/')) {
         $blog=owned_blog();
         if ($path==='/manage') { methods(['GET']);redirect('/manage/settings'); }
+        if ($path==='/manage/admin/homepage') {
+            require_admin();methods(['GET']);$id=input('blog_id',$_GET);
+            if ($id!=='' && (!ctype_digit($id) || !one("SELECT id FROM blogs WHERE id=? AND visibility='public'",[$id]))) fail(422,'invalid');
+            page('homepage',function () use($id) {
+                echo '<p>'.e(t('restore_help')).'</p><form method="post" action="/manage/admin">';token_field();
+                echo '<input type="hidden" name="blog_id" value="'.e($id).'"><div class="actions">'.link_to('/manage/admin','cancel');button('confirm');echo '</div></form>';
+            },null,$blog);return;
+        }
         if ($path==='/manage/admin') {
             require_admin();methods(['GET','POST']);
             $error=submitted(function () {save_platform_home(input('blog_id'));redirect('/manage/admin',303,'saved');});
