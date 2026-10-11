@@ -39,7 +39,7 @@ function t(string $key): string {
     static $strings = [
         'username'=>'nombre de usuario', 'create_blog'=>'crear blog',
         'have_account'=>'¿ya tienes cuenta?', 'login'=>'entrar', 'logout'=>'salir', 'register'=>'crear tu blog', 'password'=>'contraseña', 'confirm_password'=>'repetir contraseña',
-        'password_help'=>'al menos 12 caracteres; no hay recuperación automática de cuentas', 'username_help'=>'3–24 letras minúsculas, números o guiones; sin guiones seguidos ni en los extremos',
+        'password_help'=>'min 12 caracteres', 'username_help'=>'min 3 letras',
         'home'=>'inicio', 'manage'=>'gestionar', 'sections'=>'secciones', 'appearance'=>'apariencia', 'settings'=>'ajustes', 'addons'=>'addons', 'addons_empty'=>'no hay addons instalados', 'blog'=>'ver blog', 'new_post'=>'nueva entrada',
         'edit'=>'editar', 'delete'=>'eliminar', 'title'=>'título', 'description'=>'descripción breve', 'section'=>'sección', 'unsectioned'=>'sin sección', 'content'=>'contenido Markdown',
         'save'=>'guardar', 'draft'=>'borrador', 'save_draft'=>'guardar borrador', 'publish'=>'publicar', 'empty'=>'todavía no hay entradas', 'blogs'=>'blogs', 'edit_home'=>'editar inicio',
