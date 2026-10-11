@@ -7,7 +7,7 @@ function route_manage(string $path): void {
         if ($path==='/manage/admin/signups') {
             require_admin();methods(['GET','POST']);$enabled=input('enabled',$_SERVER['REQUEST_METHOD']==='POST'?$_POST:$_GET);
             if (!in_array($enabled,['0','1'],true)) fail(400,'invalid');
-            $error=submitted(function () use($enabled) {query('UPDATE platform SET allow_signups=? WHERE id=1',[(int)$enabled]);redirect('/manage/admin',303,'saved');});
+            $error=submitted(function () use($enabled) {update_settings(static function (array &$settings) use($enabled) {require_admin();$settings['allow_signups']=$enabled==='1';});redirect('/manage/admin',303,'saved');});
             page($enabled==='1'?'allow_signups':'close_signups',function () use($enabled) {
                 echo '<p>'.e(t('restore_help')).'</p><form method="post">';token_field();
                 echo '<input type="hidden" name="enabled" value="'.$enabled.'"><div class="actions">'.link_to('/manage/admin','cancel');button('confirm');echo '</div></form>';

@@ -86,15 +86,16 @@ function current_user(): ?array {
     return $user && (int)$user['auth_version']===(int)($_SESSION['auth_version']??0) ? $user : null;
 }
 function require_user(): array { return current_user() ?? throw new HttpError(401, t('login_required')); }
-function platform_settings(): array { return one('SELECT * FROM platform WHERE id=1') ?? throw new RuntimeException('Run install.php'); }
+function platform_settings(): array { return config(); }
 function registration_open(): bool { return config()['registration'] && (bool)platform_settings()['allow_signups']; }
 function is_admin(): bool { $user=current_user();return $user!==null && (int)$user['id']===(int)(platform_settings()['admin_user_id']??0); }
 function require_admin(): void { require_user();if (!is_admin()) fail(403,'forbidden'); }
 function save_platform_home(string $id): void {
     require_admin();
-    transaction(static function () use($id) {
+    update_settings(static function (array &$settings) use($id) {
+        require_admin();
         if ($id!=='' && (!ctype_digit($id) || !one("SELECT id FROM blogs WHERE id=? AND visibility='public'",[$id]))) fail(422,'invalid');
-        query('UPDATE platform SET homepage_blog_id=? WHERE id=1',[$id===''?null:(int)$id]);
+        $settings['homepage_blog_id']=$id===''?null:(int)$id;
     });
 }
 function authenticate(int $id): void { session_regenerate_id(true); $_SESSION = ['user_id'=>$id,'auth_version'=>(int)one('SELECT auth_version FROM users WHERE id=?',[$id])['auth_version'],'issued'=>time(),'csrf'=>bin2hex(random_bytes(32))]; }
@@ -122,9 +123,12 @@ function admin_delete_user(int $id): void {
     require_admin();$admin=require_user();
     rate_limit('admin-delete',(string)$admin['id'],10,900);
     transaction(static function () use($id) {
-        admin_user($id);
+        $user=admin_user($id);
         if ($id===(int)platform_settings()['admin_user_id']) fail(403,'forbidden');
-        query('DELETE FROM users WHERE id=?',[$id]);
+        update_settings(static function (array &$settings) use($id,$user) {
+            query('DELETE FROM users WHERE id=?',[$id]);
+            if ($settings['homepage_blog_id']===$user['blog_id']) $settings['homepage_blog_id']=null;
+        });
     });
 }
 function logout(): void {
@@ -168,7 +172,7 @@ function register_account(string $name, string $password, string $confirm, bool 
     if ($byAdmin) require_admin();elseif (!registration_open()) fail(404,'not_found');
     $name=username($name); validate_password($password,$confirm); $hash=password_make($password);
     try {
-        return transaction(function () use ($name,$hash,$byAdmin) {
+        return transaction(fn()=>update_settings(function (array &$settings) use ($name,$hash,$byAdmin) {
             if ($byAdmin) require_admin();elseif (!registration_open()) fail(404,'not_found');
             if (one('SELECT user_id FROM username_aliases WHERE username=?',[$name])) fail(422,'username_taken');
             $time=now();
@@ -176,9 +180,9 @@ function register_account(string $name, string $password, string $confirm, bool 
             $id=(int)db()->lastInsertId();
             query('INSERT INTO blogs(user_id,title,created_at,updated_at) VALUES (?,?,?,?)',[$id,$name,$time,$time]);
             enable_default_addons((int)db()->lastInsertId());
-            query('UPDATE platform SET admin_user_id=?,admin_initialized=1 WHERE id=1 AND admin_initialized=0',[$id]);
+            if (!$settings['admin_initialized']) {$settings['admin_user_id']=$id;$settings['admin_initialized']=true;}
             return ['id'=>$id,'username'=>$name];
-        });
+        }));
     } catch (PDOException $e) {
         if (one('SELECT id FROM users WHERE username=?',[$name])) fail(422,'username_taken');
         throw $e;
@@ -286,7 +290,10 @@ function delete_account(array $blog,string $password,string $confirmation): void
         if ((int)$blog['user_id']===(int)platform_settings()['admin_user_id']) fail(403,'forbidden');
         $user=one('SELECT * FROM users WHERE id=?',[$blog['user_id']]);
         if (!$user || !password_check($password,$user['password_hash']) || !hash_equals($user['username'],$confirmation)) fail(422,'delete_error');
-        query('DELETE FROM users WHERE id=?',[$user['id']]);
+        update_settings(static function (array &$settings) use($user,$blog) {
+            query('DELETE FROM users WHERE id=?',[$user['id']]);
+            if ($settings['homepage_blog_id']===(int)$blog['id']) $settings['homepage_blog_id']=null;
+        });
     });
 }
 
