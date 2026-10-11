@@ -123,7 +123,7 @@ try {
     $graph=mermaid_flowchart($flow);
     check(count($graph['nodes'])===6 && count($graph['edges'])===6 && $graph['nodes']['B']['shape']==='diamond','Mermaid example parses all nodes and edges');
     $diagram=markdown("```mermaid\n".$flow."```");
-    $svgDoc=new DOMDocument();$svgDoc->loadHTML('<?xml encoding="UTF-8">'.$diagram);$svgPath=new DOMXPath($svgDoc);
+    $svgDoc=new DOMDocument();$svgDoc->loadHTML('<?xml encoding="UTF-8">'.$diagram,LIBXML_NOERROR|LIBXML_NOWARNING);$svgPath=new DOMXPath($svgDoc);
     check($svgDoc->getElementsByTagName('svg')->length===1 && !$svgDoc->getElementsByTagName('pre')->length,'Mermaid fence becomes inline SVG');
     check($svgPath->query('//g[@class="mermaid-node"]')->length===6 && $svgPath->query('//path[@class="mermaid-edge"]')->length===6 && $svgPath->query('//polygon[@class="mermaid-arrow"]')->length===6,'All flowchart nodes and arrowheads rendered');
     check($svgPath->query('//g[@class="mermaid-node"]/polygon')->length===1 && str_contains($diagram,'¿Hay café?') && str_contains($diagram,'>Sí</text>') && str_contains($diagram,'>No</text>'),'Decision and labelled branches rendered');
@@ -133,7 +133,7 @@ try {
     check(mermaid_svg("flowchart LR\nA --> A")!==null && mermaid_svg("flowchart TB\nA[Único nodo]")!==null,'Self loops and isolated nodes');
     check(mermaid_flowchart("flowchart LR\n%% comentario\nA --> B --> C\nC[último]")['nodes']['C']['label']==='último','Chained arrows, comments and later node labels');
     $attack=markdown('```mermaid'."\nflowchart LR\n".'A["<script>alert(1)</script>"] -->|<img src=x>| B["& café"]'."\n```");
-    $attackDoc=new DOMDocument();$attackDoc->loadHTML('<?xml encoding="UTF-8">'.$attack);$attackPath=new DOMXPath($attackDoc);
+    $attackDoc=new DOMDocument();$attackDoc->loadHTML('<?xml encoding="UTF-8">'.$attack,LIBXML_NOERROR|LIBXML_NOWARNING);$attackPath=new DOMXPath($attackDoc);
     check($attackDoc->getElementsByTagName('svg')->length===1 && !$attackDoc->getElementsByTagName('script')->length && !$attackDoc->getElementsByTagName('img')->length && !$attackPath->query('//*[@href or @style or @onclick or @onerror]')->length,'Diagram labels cannot inject active SVG or HTML');
     foreach (["sequenceDiagram\nA->>B: hola", "flowchart LR\nclick A \"https://evil.test\"", "flowchart LR\nA -->", "flowchart LR\nA[roto", "flowchart LR\nA[".str_repeat('a',121).']', str_repeat('a',8193)] as $invalid) {
         check(mermaid_svg($invalid)===null,'Invalid or unsupported diagram safely rejected');

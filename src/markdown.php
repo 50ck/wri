@@ -58,7 +58,8 @@ function markdown(string $body): string {
             $svg=$diagramCount++<8 ? mermaid_svg($code->textContent) : null;
             if ($svg!==null) {
                 $fragment=$doc->createDocumentFragment();
-                if ($fragment->appendXML($svg)) {
+                // HTML establishes the SVG namespace; avoid libxml's default: prefix.
+                if ($fragment->appendXML(str_replace(' xmlns="http://www.w3.org/2000/svg"','',$svg))) {
                     $wrapper=$doc->createElement('div'); $wrapper->setAttribute('class','blog-diagram');
                     $wrapper->setAttribute('tabindex','0'); $wrapper->setAttribute('role','region');
                     $wrapper->setAttribute('aria-label',t('flowchart')); $wrapper->appendChild($fragment);
