@@ -32,15 +32,16 @@ function page(string $key,callable $content,?string $error=null,?array $manageme
     $content(); echo '</main></body></html>';
 }
 function value(string $key,string $default=''): string { return ($_SERVER['REQUEST_METHOD']==='POST') ? input($key) : $default; }
-function auth_form(string $kind,?string $error=null): void {
-    page($kind,function () use ($kind) {
-        echo '<form method="post" action="/'.$kind.'">'; token_field();
+function auth_form(string $kind,?string $error=null,?array $management=null): void {
+    $action=$management?'/manage/admin/users/new':'/'.$kind;
+    page($management?'create_user':$kind,function () use ($kind,$action) {
+        echo '<form method="post" action="'.e($action).'">'; token_field();
         field('username','username',value('username',input('username',$_GET)),'text',true,24);
         if ($kind==='register') echo '<small>'.e(t('username_help')).'</small>';
         field($kind==='register'?'new_password':'password','password','','password');
         if ($kind==='register') { field('confirm_password','confirm_password','','password'); echo '<small>'.e(t('password_help')).'</small>'; }
-        echo '<div class="actions">';button($kind);echo '</div></form>';
-    },$error);
+        echo '<div class="actions">';button($action==='/manage/admin/users/new'?'create_user':$kind);echo '</div></form>';
+    },$error,$management);
 }
 function icon_link(string $path,string $key,string $shape): void {
     $shapes=['plus'=>'M8 2v12M2 8h12','pencil'=>'M3 10l7-7 3 3-7 7-4 1zM9 4l3 3','trash'=>'M3 4h10M6 4V2h4v2M4 4l1 10h6l1-10','settings'=>'M8 1v2M8 13v2M1 8h2M13 8h2M3 3l2 2M11 11l2 2M3 13l2-2M11 5l2-2'];
@@ -164,13 +165,14 @@ function manage_addons(array $blog,?string $error=null): void {
 function manage_admin(array $blog,?string $error=null): void {
     page('admin',function () {
         $platform=platform_settings();$home=$platform['homepage_blog_id'];
+        echo '<p>'.link_to('/manage/admin/signups?enabled='.($platform['allow_signups']?'0':'1'),$platform['allow_signups']?'close_signups':'allow_signups').'</p>';
         if ($home!==null) echo '<p>'.link_to('/manage/admin/homepage','use_platform_home').'</p>';
         echo '<h3>'.e(t('users')).'</h3>';
         $number=input('page',$_GET);
         if ($number!=='' && (!ctype_digit($number) || (int)$number<1 || (int)$number>10000)) fail(400,'invalid');
         $page=max(1,(int)$number);
         $users=query('SELECT u.id AS user_id,u.username,b.id,b.visibility FROM users u JOIN blogs b ON b.user_id=u.id ORDER BY u.id LIMIT 51 OFFSET ?',[($page-1)*50])->fetchAll();
-        $more=count($users)>50;echo '<ul class="section-list">';
+        $more=count($users)>50;echo '<ul class="section-list"><li>'.link_to('/manage/admin/users/new','create_user').'</li>';
         foreach (array_slice($users,0,50) as $user) {
             echo '<li><a href="/'.e($user['username']).'">'.e($user['username']).'</a>';
             echo ' <span class="section-actions">';

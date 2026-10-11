@@ -13,12 +13,12 @@ function route_index(string $path): void {
         page('brand',function () {
             echo '<p>'.e(t('intro')).'</p>';
             echo '<p>'.link_to('/login','login');
-            if (config()['registration']) echo ' '.e(t('or')).' '.link_to('/register','sign_up');
+            if (registration_open()) echo ' '.e(t('or')).' '.link_to('/register','sign_up');
             echo '</p>';addon_slot('home_after');
         });return;
     }
-    if ($path==='/register') {
-        methods(['GET','POST']);if (!config()['registration']) fail(403,'registration_closed');
+    if (in_array($path,['/register','/signup'],true)) {
+        if (!registration_open()) fail(404,'not_found');methods(['GET','POST']);
         $error=submitted(function () {
             rate_limit('registration',$_SERVER['REMOTE_ADDR']??'',5,3600);
             $user=register_account(input('username'),input('new_password'),input('confirm_password'));

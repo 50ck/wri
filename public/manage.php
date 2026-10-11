@@ -4,6 +4,20 @@ function route_manage(string $path): void {
     if ($path==='/manage' || str_starts_with($path,'/manage/')) {
         $blog=owned_blog();
         if ($path==='/manage') { methods(['GET']);redirect('/manage/settings'); }
+        if ($path==='/manage/admin/signups') {
+            require_admin();methods(['GET','POST']);$enabled=input('enabled',$_SERVER['REQUEST_METHOD']==='POST'?$_POST:$_GET);
+            if (!in_array($enabled,['0','1'],true)) fail(400,'invalid');
+            $error=submitted(function () use($enabled) {query('UPDATE platform SET allow_signups=? WHERE id=1',[(int)$enabled]);redirect('/manage/admin',303,'saved');});
+            page($enabled==='1'?'allow_signups':'close_signups',function () use($enabled) {
+                echo '<p>'.e(t('restore_help')).'</p><form method="post">';token_field();
+                echo '<input type="hidden" name="enabled" value="'.$enabled.'"><div class="actions">'.link_to('/manage/admin','cancel');button('confirm');echo '</div></form>';
+            },$error,$blog);return;
+        }
+        if ($path==='/manage/admin/users/new') {
+            require_admin();methods(['GET','POST']);
+            $error=submitted(function () {register_account(input('username'),input('new_password'),input('confirm_password'),true);redirect('/manage/admin',303,'saved');});
+            auth_form('register',$error,$blog);return;
+        }
         if (preg_match('~\A/manage/admin/users/([1-9][0-9]*)/(edit|delete)\z~',$path,$m)) {
             require_admin();methods(['GET','POST']);$user=admin_user((int)$m[1]);$self=$user['id']===$blog['user_id'];
             if ($m[2]==='delete' && $self) fail(403,'forbidden');

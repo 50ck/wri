@@ -34,6 +34,9 @@ function migrate(): void {
             db()->exec('ALTER TABLE users ADD COLUMN auth_version INTEGER NOT NULL DEFAULT 0');
             db()->exec('CREATE TABLE username_aliases (username TEXT PRIMARY KEY COLLATE NOCASE, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE)');
         },
+        '006_signups' => static function () {
+            db()->exec('ALTER TABLE platform ADD COLUMN allow_signups INTEGER NOT NULL DEFAULT 1 CHECK(allow_signups IN (0,1))');
+        },
     ];
     foreach ($migrations as $version => $apply) transaction(static function () use ($version,$apply) {
         if (!one('SELECT version FROM migrations WHERE version=?',[$version])) {

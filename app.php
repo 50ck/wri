@@ -87,6 +87,7 @@ function current_user(): ?array {
 }
 function require_user(): array { return current_user() ?? throw new HttpError(401, t('login_required')); }
 function platform_settings(): array { return one('SELECT * FROM platform WHERE id=1') ?? throw new RuntimeException('Run install.php'); }
+function registration_open(): bool { return config()['registration'] && (bool)platform_settings()['allow_signups']; }
 function is_admin(): bool { $user=current_user();return $user!==null && (int)$user['id']===(int)(platform_settings()['admin_user_id']??0); }
 function require_admin(): void { require_user();if (!is_admin()) fail(403,'forbidden'); }
 function save_platform_home(string $id): void {
@@ -164,11 +165,12 @@ function headers_for(?array $blog = null, bool $preview = false, array $addonSty
     send_header('Content-Type: text/html; charset=utf-8');
 }
 
-function register_account(string $name, string $password, string $confirm): array {
-    if (!config()['registration']) fail(403,'registration_closed');
+function register_account(string $name, string $password, string $confirm, bool $byAdmin=false): array {
+    if ($byAdmin) require_admin();elseif (!registration_open()) fail(404,'not_found');
     $name=username($name); validate_password($password,$confirm); $hash=password_make($password);
     try {
-        return transaction(function () use ($name,$hash) {
+        return transaction(function () use ($name,$hash,$byAdmin) {
+            if ($byAdmin) require_admin();elseif (!registration_open()) fail(404,'not_found');
             if (one('SELECT user_id FROM username_aliases WHERE username=?',[$name])) fail(422,'username_taken');
             $time=now();
             query('INSERT INTO users(username,password_hash,created_at,updated_at) VALUES (?,?,?,?)',[$name,$hash,$time,$time]);
@@ -315,7 +317,7 @@ function route(): void {
     if ($path!=='/' && str_ends_with($path,'/')) { methods(['GET']);redirect(rtrim($path,'/'),308); }
     if ($path==='/_addons' || str_starts_with($path,'/_addons/')) { addon_route(null,'platform',array_slice(explode('/',trim($path,'/')),1)); }
     elseif ($path==='/manage' || str_starts_with($path,'/manage/')) { require_once __DIR__.'/public/manage.php';route_manage($path); }
-    elseif (in_array($path,['/','/register','/login','/logout'],true)) route_index($path);
+    elseif (in_array($path,['/','/register','/signup','/login','/logout'],true)) route_index($path);
     else { require_once __DIR__.'/public/blog.php';route_blog($path); }
 }
 function run(): void {
