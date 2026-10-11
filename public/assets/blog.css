@@ -15,7 +15,7 @@
 .blog pre { max-width: 100%; overflow-x: auto; overflow-wrap: normal; padding: .5rem 0; }
 .blog code { font-family: monospace; }
 .blog-table { max-width: 100%; overflow-x: auto; margin: 1rem 0; }
-.blog table { width: 100%; border-collapse: collapse; }
+.blog table { width: 100%; border-collapse: collapse; overflow-wrap: normal; }
 .blog th, .blog td { padding: .4rem .7rem; text-align: left; vertical-align: top; border-bottom: 1px solid #555; }
 .blog .markdown-align-left { text-align: left; }
 .blog .markdown-align-center { text-align: center; }

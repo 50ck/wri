@@ -14,7 +14,7 @@ cd blog
 php bin/install.php
 ```
 
-The installer creates private storage and runs versioned migrations transactionally. It is safe to run again. Do not expose the repository root through the web server. Only `public/` is a document root. Parsedown 1.7.4 is vendored with its MIT license; Composer is unnecessary.
+The installer creates private storage and runs versioned migrations transactionally. It is safe to run again. Do not expose the repository root through the web server. Only `public/` is a document root. Parsedown 1.8.0 is vendored with its MIT license; Composer is unnecessary.
 
 On Void, install the versioned PHP packages (or the distribution's `php`, `php-fpm`, `php-sqlite` meta-packages), enable `pdo_sqlite` in PHP's configuration, and check both CLI and FPM extension configuration. See the [Void PHP handbook](https://docs.voidlinux.org/config/php.html). With the extension installed but disabled, use `php -d extension=pdo_sqlite bin/install.php`.
 
@@ -100,6 +100,10 @@ The customizable stylesheet is served as `text/css` with `nosniff`, never embedd
 .blog-footer
 .blog-owner
 .blog-settings
+.blog-table
+.markdown-align-left
+.markdown-align-center
+.markdown-align-right
 ```
 
 ## Data and routes
@@ -108,7 +112,7 @@ All variable SQL uses prepared statements. Foreign keys enforce ownership of sec
 
 Usernames are trimmed and converted to lowercase ASCII before validation; accepted format is 3–24 ASCII letters/digits/hyphens, without consecutive or edge hyphens. Operational and application names are centrally reserved in `src/config.php`. The `inicio` and `blogs` section paths are reserved. Migration 002 adds the singleton homepage field; existing sections using those paths receive the first available numeric suffix, retaining their text, posts and redirects from old post URLs. Section and post slugs use lowercase ASCII with single hyphens, a maximum 60-character initial base and numeric collision suffixes. Spanish accents are transliterated; other characters are discarded, with `entrada` as a fallback. Slugs remain stable on title changes. Moving posts may add a collision suffix, while old URLs redirect to their current location. Deleted post slugs are retained to avoid silently reusing their URLs.
 
-Markdown uses [Parsedown 1.7.4](https://github.com/erusev/parsedown/tree/1.7.4) safe mode with raw HTML escaped and an additional DOM allowlist. No extensions, embeds, images or active attributes survive. Links are restricted to HTTP(S), mailto, root-relative paths and fragments. Code blocks have no client-side highlighting. Ordinary text is escaped with UTF-8 context-safe HTML escaping.
+Markdown uses [Parsedown 1.8.0](https://github.com/erusev/parsedown/tree/1.8.0) safe mode with raw HTML escaped and an additional DOM allowlist. No extensions, embeds, image requests or active attributes survive. Image syntax renders only its escaped alternative text. Markdown tables retain their contents and alignment using trusted CSS classes, with keyboard-accessible horizontal scroll containers. Heading IDs keep Unicode letters and use lowercase text with hyphenated whitespace and numeric suffixes for duplicates, so internal index links work. Long words wrap; code blocks scroll within their column. Links are restricted to HTTP(S), mailto, root-relative paths and fragments. Code blocks have no client-side highlighting. Raw HTML is displayed as text. Task lists, GitHub alerts, footnotes, mathematics and Mermaid diagrams are not interpreted; backslash hard breaks are unsupported by this parser (use two trailing spaces). Ordinary text is escaped with UTF-8 context-safe HTML escaping.
 
 Primary routes are `/`, `/register`, `/login`, POST `/logout`, `/{username}`, `/{username}/blogs`, `/{username}/style.css`, `/{username}/new`, `/{username}/edit/{post-id}`, `/{username}/delete/{post-id}`, `/{username}/{section}`, `/{username}/posts/{slug}`, and `/{username}/{section}/{slug}`. Management routes are `/manage/sections`, `/manage/appearance`, `/manage/settings`, with explicit edit/delete/reorder/restore suffixes. Mutations require POST and CSRF; successful mutations redirect with 303. Wrong methods return 405. Private or missing content returns 404; protected routes return 401 and cross-owner attempts return 403/404. Validation failures preserve non-password fields. HTTPS sessions are regenerated on registration/login.
 
