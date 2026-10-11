@@ -10,7 +10,7 @@ function markdown(string $body): string {
     $doc->loadHTML('<?xml encoding="UTF-8"><div id="markdown-root">'.$html.'</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD | LIBXML_NONET);
     libxml_clear_errors(); libxml_use_internal_errors($previous);
     $allowed=['p','h1','h2','h3','h4','h5','h6','em','strong','a','ul','ol','li','blockquote','pre','code','hr','br','del','table','thead','tbody','tr','th','td'];
-    $headings=[]; $tables=[];
+    $headings=[]; $tables=[]; $blocks=[]; $quotes=[];
     foreach (iterator_to_array($doc->getElementsByTagName('*')) as $node) {
         if ($node->getAttribute('id')==='markdown-root') continue;
         if ($node->nodeName==='img') {
@@ -18,7 +18,8 @@ function markdown(string $body): string {
             continue;
         }
         if (!in_array($node->nodeName,$allowed,true)) { $node->parentNode?->removeChild($node); continue; }
-        $alignment=null;
+        $alignment=null; $language=null;
+        if ($node->nodeName==='code' && $node->parentNode->nodeName==='pre' && preg_match('/\Alanguage-([a-z0-9_-]+)\z/i',$node->getAttribute('class'),$match)) $language=strtolower($match[1]);
         if (in_array($node->nodeName,['th','td'],true) && preg_match('/\Atext-align: (left|center|right);\z/', $node->getAttribute('style'), $match)) $alignment=$match[1];
         foreach (iterator_to_array($node->attributes) as $attr) {
             if ($node->nodeName==='a' && $attr->name==='title') continue;
@@ -33,6 +34,38 @@ function markdown(string $body): string {
         if ($node->nodeName==='a') $node->setAttribute('rel','nofollow noreferrer');
         if (preg_match('/\Ah[1-6]\z/', $node->nodeName)) $headings[]=$node;
         if ($node->nodeName==='table') $tables[]=$node;
+        if ($language) $blocks[]=[$node,$language];
+        if ($node->nodeName==='blockquote') $quotes[]=$node;
+    }
+    foreach ($quotes as $quote) {
+        $first=$quote->firstChild;
+        while ($first && $first->nodeType===XML_TEXT_NODE && trim($first->textContent)==='') $first=$first->nextSibling;
+        $text=$first?->firstChild;
+        if ($first?->nodeName!=='p' || $text?->nodeType!==XML_TEXT_NODE || !preg_match('/\A\[!(NOTE|TIP|WARNING)\](?:\r?\n|$)/',$text->textContent,$match)) continue;
+        $type=strtolower($match[1]);
+        $text->nodeValue=substr($text->textContent,strlen($match[0]));
+        if (trim($first->textContent)==='' && !$first->getElementsByTagName('*')->length) $quote->removeChild($first);
+        $quote->setAttribute('class','markdown-alert markdown-alert-'.$type);
+        $title=$doc->createElement('p'); $title->setAttribute('class','markdown-alert-title');
+        $title->appendChild($doc->createTextNode(t('alert_'.$type)));
+        $quote->insertBefore($title,$quote->firstChild);
+    }
+    // Explicit languages only; oversized blocks stay escaped plain text.
+    $budget=65536;
+    foreach ($blocks as [$code,$language]) {
+        $size=strlen($code->textContent);
+        if ($size>16384 || $size>$budget) continue;
+        $budget-=$size;
+        $highlighted=highlight_code($language,$code->textContent);
+        if ($highlighted===null) continue;
+        $fragment=$doc->createDocumentFragment();
+        if (!$fragment->appendXML($highlighted)) continue;
+        // Only text and known token spans can enter the sanitized document.
+        $valid=true;
+        foreach ($fragment->childNodes as $child) if (!highlight_node_safe($child)) { $valid=false; break; }
+        if (!$valid || $fragment->textContent!==$code->textContent) continue;
+        while ($code->firstChild) $code->removeChild($code->firstChild);
+        $code->appendChild($fragment);
     }
     // IDs originate exclusively from escaped heading text, never raw user HTML.
     $used=['main'=>true,'markdown-root'=>true]; $targets=[];
@@ -63,4 +96,24 @@ function markdown(string $body): string {
     $root=$doc->getElementById('markdown-root'); $result='';
     if ($root) foreach ($root->childNodes as $child) $result .= $doc->saveHTML($child);
     return $result;
+}
+
+function highlight_code(string $language, string $code): ?string {
+    $aliases=['js'=>'javascript','ts'=>'typescript','html'=>'xml','sh'=>'bash','shell'=>'bash','py'=>'python','yml'=>'yaml','md'=>'markdown'];
+    $language=$aliases[$language] ?? $language;
+    if (!in_array($language,['bash','css','diff','ini','javascript','json','markdown','php','python','sql','typescript','xml','yaml'],true)) return null;
+    static $highlighter=null;
+    if ($highlighter===null) {
+        require_once dirname(__DIR__).'/vendor/highlight/Highlight/Autoloader.php';
+        spl_autoload_register([\Highlight\Autoloader::class,'load']);
+        $highlighter=new \Highlight\Highlighter();
+    }
+    try { return $highlighter->highlight($language,$code)->value; }
+    catch (Throwable $error) { error_log('Syntax highlighting failed: '.$error->getMessage()); return null; }
+}
+function highlight_node_safe(DOMNode $node): bool {
+    if ($node->nodeType===XML_TEXT_NODE) return true;
+    if (!$node instanceof DOMElement || $node->tagName!=='span' || $node->attributes->length!==1 || !preg_match('/\Ahljs-[a-z0-9_-]+(?: hljs-[a-z0-9_-]+)*\z/',$node->getAttribute('class'))) return false;
+    foreach ($node->childNodes as $child) if (!highlight_node_safe($child)) return false;
+    return true;
 }

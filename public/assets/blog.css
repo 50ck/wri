@@ -12,7 +12,7 @@
 .blog-post-date { color: #b5b5b5; font-size: .85rem; margin-right: .75rem; }
 .blog-post-title { line-height: 1.25; }
 .blog-footer { margin-top: 3rem; font-size: .85rem; }
-.blog pre { max-width: 100%; overflow-x: auto; overflow-wrap: normal; padding: .5rem 0; }
+.blog pre { max-width: 100%; overflow-x: auto; overflow-wrap: normal; padding: 1rem; box-sizing: border-box; background: #242424; }
 .blog code { font-family: monospace; }
 .blog pre, .blog-table { scrollbar-color: #777 #171717; }
 .blog-table { max-width: 100%; overflow-x: auto; margin: 1rem 0; }
@@ -29,3 +29,18 @@
 .blog .skip { position: absolute; left: -9999px; }
 .blog .skip:focus { left: 1rem; top: 1rem; }
 @media (max-width: 600px) { .blog { margin: 2rem auto; } }
+
+.blog .markdown-alert { padding: .6rem 1rem; background: #202020; }
+.blog .markdown-alert-title { margin: 0 0 .4rem; font-weight: 600; }
+.blog .markdown-alert > :last-child { margin-bottom: 0; }
+.blog .markdown-alert-note { border-color: #9fc3e8; }
+.blog .markdown-alert-tip { border-color: #afd3a0; }
+.blog .markdown-alert-warning { border-color: #e0c384; }
+.blog .hljs-comment, .blog .hljs-quote { color: #b0b0b0; }
+.blog .hljs-keyword, .blog .hljs-selector-tag, .blog .hljs-meta { color: #cdb4e8; }
+.blog .hljs-string, .blog .hljs-regexp, .blog .hljs-addition { color: #afd3a0; }
+.blog .hljs-number, .blog .hljs-literal, .blog .hljs-attr, .blog .hljs-attribute { color: #e0c384; }
+.blog .hljs-title, .blog .hljs-built_in, .blog .hljs-section, .blog .hljs-name { color: #9fc3e8; }
+.blog .hljs-deletion { color: #eda7a7; }
+.blog .hljs-emphasis { font-style: italic; }
+.blog .hljs-strong { font-weight: bold; }
