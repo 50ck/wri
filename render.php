@@ -53,7 +53,7 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
         foreach ($doc->getElementsByTagName('img') as $image) $images[]=$image->getAttribute('src');
     }
     headers_for($blog,$preview,images:$images); $owner=is_owner($blog) && !$preview;
-    echo '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e(($post['title'] ?? $section['title'] ?? $blog['title'])).'</title><link rel="stylesheet" href="/'.e($blog['username']).'/style.css"></head><body class="blog"><a class="skip" href="#main">'.e(t('skip')).'</a><header class="blog-header"><h1 class="blog-title"><a href="/'.e($blog['username']).'">'.e($blog['title']).'</a></h1>';
+    echo '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e(($post['title'] ?? $section['title'] ?? $blog['title'])).'</title><link rel="stylesheet" href="/'.e($blog['username']).'/style.css"></head><body class="blog"><header class="blog-header"><h1 class="blog-title"><a href="/'.e($blog['username']).'">'.e($blog['title']).'</a></h1>';
     if ($blog['description']!=='') echo '<p class="blog-description">'.e($blog['description']).'</p>';
     echo '<nav class="blog-nav" aria-label="'.e(t('sections')).'">'.link_to('/'.$blog['username'],'home').' '.link_to('/'.$blog['username'].'/blogs','blogs');
     foreach (section_list($blog['id']) as $item) echo '<a href="/'.e($blog['username']).'/'.e($item['slug']).'">'.e($item['title']).'</a>';

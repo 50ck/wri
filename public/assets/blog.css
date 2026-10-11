@@ -27,8 +27,6 @@
 .blog-settings { position: absolute; right: 1.25rem; bottom: 1.25rem; line-height: 1; }
 .blog svg { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 1.5; }
 .blog :focus-visible { outline: 2px solid #9fc3e8; outline-offset: 3px; }
-.blog .skip { position: absolute; left: -9999px; }
-.blog .skip:focus { left: 1rem; top: 1rem; }
 @media (max-width: 600px) { .blog { margin: 2rem auto; } }
 
 .blog .markdown-alert { padding: .6rem 1rem; background: #202020; }
