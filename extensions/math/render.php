@@ -46,7 +46,7 @@ function math_element(DOMDocument $doc,string $tex,string $display): ?DOMElement
     static $loaded=false;
     if (!$loaded) {
         spl_autoload_register(function (string $class): void {
-            if (str_starts_with($class,'Latex2MathML\\')) require __DIR__.'/vendor/src/'.str_replace('\\','/',substr($class,13)).'.php';
+            if (str_starts_with($class,'Latex2MathML\\')) require __DIR__.'/libraries/src/'.str_replace('\\','/',substr($class,13)).'.php';
         }); $loaded=true;
     }
     set_error_handler(static function (int $level,string $message): never { throw new ErrorException($message,0,$level); });

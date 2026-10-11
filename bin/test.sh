@@ -8,5 +8,5 @@ else
     php -d extension=pdo_sqlite tests/core.php
 fi
 python3 tests/integration.py "$@"
-find public extensions bin tests config vendor -name '*.php' -exec php -l '{}' \;
+find public extensions bin tests config libraries -name '*.php' -exec php -l '{}' \;
 for file in ./*.php; do php -l "$file"; done

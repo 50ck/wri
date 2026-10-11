@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-require_once __DIR__.'/vendor/parsedown/Parsedown.php';
+require_once __DIR__.'/libraries/parsedown/Parsedown.php';
 function markdown(string $body,?array $blog=null): string {
     $active=active_addons($blog);
     $parser=new AddonMarkdown();

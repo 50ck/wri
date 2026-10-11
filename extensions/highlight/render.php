@@ -6,7 +6,7 @@ function highlight_code(string $language, string $code): ?string {
     if (!in_array($language,['bash','css','diff','ini','javascript','json','markdown','php','python','sql','typescript','xml','yaml'],true)) return null;
     static $highlighter=null;
     if ($highlighter===null) {
-        require_once __DIR__.'/vendor/Highlight/Autoloader.php';
+        require_once __DIR__.'/libraries/Highlight/Autoloader.php';
         spl_autoload_register([\Highlight\Autoloader::class,'load']);
         $highlighter=new \Highlight\Highlighter();
     }
