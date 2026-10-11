@@ -4,10 +4,10 @@ declare(strict_types=1);
 // Keep TeX out of Markdown's emphasis/escaping handlers, including inside quotes/lists.
 class MathMarkdown extends Parsedown {
     public function __construct() {
-        $this->inlineTypes['$']=['Math'];
-        array_unshift($this->inlineTypes['\\'],'Math');
+        $this->InlineTypes['$']=['Math'];
+        array_unshift($this->InlineTypes['\\'],'Math');
         $this->inlineMarkerList.='$';
-        $this->blockTypes['$']=['Math']; $this->blockTypes['\\']=['Math'];
+        $this->BlockTypes['$']=['Math']; $this->BlockTypes['\\']=['Math'];
     }
     protected function inlineMath($excerpt) {
         $text=$excerpt['text']; $display='inline'; $match=[];
