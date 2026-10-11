@@ -2,8 +2,10 @@
 declare(strict_types=1);
 require_once dirname(__DIR__) . '/vendor/parsedown/Parsedown.php';
 require_once __DIR__.'/mermaid.php';
+require_once __DIR__.'/diagrams.php';
+require_once __DIR__.'/math.php';
 function markdown(string $body): string {
-    $parser = new Parsedown();
+    $parser = new MathMarkdown();
     $html = $parser->setSafeMode(true)->setMarkupEscaped(true)->setUrlsLinked(false)->text($body);
     // Defense in depth: no embeds, resource-loading elements or active attributes.
     $doc = new DOMDocument();
@@ -11,7 +13,7 @@ function markdown(string $body): string {
     $doc->loadHTML('<?xml encoding="UTF-8"><div id="markdown-root">'.$html.'</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD | LIBXML_NONET);
     libxml_clear_errors(); libxml_use_internal_errors($previous);
     $allowed=['p','h1','h2','h3','h4','h5','h6','em','strong','a','ul','ol','li','blockquote','pre','code','hr','br','del','table','thead','tbody','tr','th','td'];
-    $headings=[]; $tables=[]; $blocks=[]; $quotes=[];
+    $headings=[]; $tables=[]; $blocks=[]; $quotes=[]; $formulas=[];
     foreach (iterator_to_array($doc->getElementsByTagName('*')) as $node) {
         if ($node->getAttribute('id')==='markdown-root') continue;
         if ($node->nodeName==='img') {
@@ -20,6 +22,7 @@ function markdown(string $body): string {
         }
         if (!in_array($node->nodeName,$allowed,true)) { $node->parentNode?->removeChild($node); continue; }
         $alignment=null; $language=null;
+        if ($node->nodeName==='code' && in_array($node->getAttribute('class'),['math-inline','math-block','language-math'],true)) $formulas[]=[$node,$node->getAttribute('class')==='math-inline' ? 'inline' : 'block'];
         if ($node->nodeName==='code' && $node->parentNode->nodeName==='pre' && preg_match('/\Alanguage-([a-z0-9_-]+)\z/i',$node->getAttribute('class'),$match)) $language=strtolower($match[1]);
         if (in_array($node->nodeName,['th','td'],true) && preg_match('/\Atext-align: (left|center|right);\z/', $node->getAttribute('style'), $match)) $alignment=$match[1];
         foreach (iterator_to_array($node->attributes) as $attr) {
@@ -51,11 +54,25 @@ function markdown(string $body): string {
         $title->appendChild($doc->createTextNode(t('alert_'.$type)));
         $quote->insertBefore($title,$quote->firstChild);
     }
+    $mathBudget=65536; $mathCount=0;
+    foreach ($formulas as [$code,$display]) {
+        $tex=$code->textContent; $size=strlen($tex);
+        $math=$mathCount++<128 && $size<=$mathBudget ? math_element($doc,$tex,$display) : null;
+        $mathBudget-=$size;
+        if (!$math) continue;
+        if ($display==='block') {
+            $wrapper=$doc->createElement('span');$wrapper->setAttribute('class','math-block');
+            $wrapper->setAttribute('tabindex','0');$wrapper->setAttribute('role','region');$wrapper->setAttribute('aria-label',t('formula'));
+            $wrapper->appendChild($math);
+            $target=$code->parentNode->nodeName==='pre' ? $code->parentNode : $code;
+            $target->parentNode->replaceChild($wrapper,$target);
+        } else $code->parentNode->replaceChild($math,$code);
+    }
     // Explicit languages only; oversized blocks stay escaped plain text.
-    $budget=65536; $diagramCount=0;
+    $budget=65536; $diagramCount=0; $diagramDeadline=microtime(true)+6;
     foreach ($blocks as [$code,$language]) {
         if ($language==='mermaid') {
-            $svg=$diagramCount++<8 ? mermaid_svg($code->textContent) : null;
+            $svg=$diagramCount++<16 ? diagram_svg($code->textContent,$diagramDeadline) : null;
             if ($svg!==null) {
                 $fragment=$doc->createDocumentFragment();
                 // HTML establishes the SVG namespace; avoid libxml's default: prefix.

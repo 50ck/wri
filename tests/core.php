@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 $dir=sys_get_temp_dir().'/blog-core-'.bin2hex(random_bytes(6));mkdir($dir,0700);
+putenv('BLOG_MERMAID_BIN=/nonexistent');
 putenv('BLOG_DATABASE='.$dir.'/test.sqlite');putenv('BLOG_ARGON_MEMORY=8192');putenv('BLOG_ARGON_TIME=1');
 require dirname(__DIR__).'/src/bootstrap.php';
 $checks=0;
@@ -142,7 +143,7 @@ try {
     $tooMany="flowchart LR\n";for($i=0;$i<41;$i++)$tooMany.='N'.$i."\n";
     check(mermaid_svg($tooMany)===null,'Diagram node limit');
     check(mermaid_svg("flowchart LR\n".str_repeat("A --> B\n",81))===null,'Diagram edge limit');
-    check(substr_count(markdown(str_repeat("```mermaid\nflowchart LR\nA --> B\n```\n\n",9)),'class="mermaid-diagram"')===8,'Per-document diagram limit');
+    check(substr_count(markdown(str_repeat("```mermaid\nflowchart LR\nA --> B\n```\n\n",17)),'class="mermaid-diagram"')===16,'Per-document diagram limit');
     check(!str_contains(markdown("<svg onload=alert(1)><script>evil</script></svg>"),'<svg'),'Raw user SVG remains escaped');
     check(e('<"&')==='&lt;&quot;&amp;','HTML escaping');
     delete_post($blog,$post);rejects(fn()=>owned_post($blog,$post),404);

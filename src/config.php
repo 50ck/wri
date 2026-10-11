@@ -13,6 +13,7 @@ function config(): array {
         'request_limit' => (int)(getenv('BLOG_REQUEST_LIMIT') ?: 262144),
         'body_limit' => (int)(getenv('BLOG_BODY_LIMIT') ?: 131072),
         'css_limit' => (int)(getenv('BLOG_CSS_LIMIT') ?: 65536),
+        'mermaid_bin' => getenv('BLOG_MERMAID_BIN') ?: "$root/bin/mmdr",
         'post_limit' => (int)(getenv('BLOG_POST_LIMIT') ?: 10000),
         'session_lifetime' => (int)(getenv('BLOG_SESSION_LIFETIME') ?: 86400),
         'argon_memory' => (int)(getenv('BLOG_ARGON_MEMORY') ?: 65536),
