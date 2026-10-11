@@ -7,7 +7,26 @@ $checks=0;
 function check(bool $ok,string $label): void { global $checks;if (!$ok) throw new RuntimeException($label);$checks++; }
 function rejects(callable $fn,int $status): void { try {$fn();}catch(HttpError $e){check($e->status===$status,'Unexpected rejection');return;}throw new RuntimeException('Expected rejection'); }
 try {
+    // Upgrade a real v1 database, including conflicting section paths.
+    db()->exec(file_get_contents(dirname(__DIR__).'/database/migrations/001.sql'));
+    db()->exec('CREATE TABLE migrations (version TEXT PRIMARY KEY, applied_at TEXT NOT NULL)');
+    query('INSERT INTO migrations VALUES (?,?)',['001.sql',now()]);
+    query('INSERT INTO users(username,password_hash,created_at,updated_at) VALUES (?,?,?,?)',['legacy','unused',now(),now()]);
+    $legacyUser=(int)db()->lastInsertId();
+    query('INSERT INTO blogs(user_id,title,created_at,updated_at) VALUES (?,?,?,?)',[$legacyUser,'legacy',now(),now()]);
+    $legacyBlog=(int)db()->lastInsertId();
+    foreach (['blogs','blogs-2','inicio'] as $slug) query('INSERT INTO sections(blog_id,title,slug,content_markdown,created_at,updated_at) VALUES (?,?,?,?,?,?)',[$legacyBlog,$slug,$slug,'preserved introduction',now(),now()]);
+    $legacySection=one('SELECT id FROM sections WHERE blog_id=? AND slug=?',[$legacyBlog,'blogs'])['id'];
+    query('INSERT INTO posts(blog_id,section_id,title,slug,body_markdown,status,created_at,updated_at,published_at) VALUES (?,?,?,?,?,?,?,?,?)',[$legacyBlog,$legacySection,'Existing post','existing','preserved post','published',now(),now(),now()]);
+    $legacyPost=(int)db()->lastInsertId();
     migrate();migrate();
+    check(one('SELECT home_markdown FROM blogs WHERE id=?',[$legacyBlog])['home_markdown']==='','Migration initializes singleton homepage');
+    check(one('SELECT slug FROM sections WHERE id=?',[$legacySection])['slug']==='blogs-3','Migration resolves section collision');
+    check((bool)one('SELECT id FROM sections WHERE blog_id=? AND slug=?',[$legacyBlog,'inicio-2']),'Migration reserves inicio');
+    check(one('SELECT body_markdown FROM posts WHERE id=?',[$legacyPost])['body_markdown']==='preserved post','Migration preserves posts');
+    check(one('SELECT content_markdown FROM sections WHERE id=?',[$legacySection])['content_markdown']==='preserved introduction','Migration preserves sections');
+    check(one('SELECT post_id FROM redirects WHERE blog_id=? AND old_path=?',[$legacyBlog,'blogs/existing'])['post_id']===$legacyPost,'Migration keeps old post URL');
+
     $user=register_account('  ALICE  ','contraseña muy larga','contraseña muy larga');
     $blog=one('SELECT b.*,u.username FROM blogs b JOIN users u ON u.id=b.user_id WHERE user_id=?',[$user['id']]);
     check($blog['username']==='alice','Normalization and atomic blog creation');
@@ -26,6 +45,9 @@ try {
     try {register_account('broken','password long enough','password long enough');throw new RuntimeException('Expected rollback');}catch(PDOException){}
     check(!one('SELECT * FROM users WHERE username=?',['broken']),'No orphan account after blog failure');
     db()->exec('DROP TRIGGER break_blog');
+    save_home($blog,'**Inicio personalizado**');
+    check(one('SELECT home_markdown FROM blogs WHERE id=?',[$blog['id']])['home_markdown']==='**Inicio personalizado**','Singleton homepage persists');
+    check(in_array('blogs',section_reserved_names(),true) && free_section_slug($blog['id'],'blogs')!=='blogs' && free_section_slug($blog['id'],'inicio')!=='inicio','Built-in section routes reserved');
     $section=add_section($blog,'Diário','## Introducción');
     edit_section($blog,$section,'Diario nuevo','intro');check(owned_section($blog,$section)['slug']==='diario','Stable section slug');
     $post=save_post($blog,null,'Primera entrada','Hola',$section,'published');

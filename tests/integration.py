@@ -140,7 +140,7 @@ class Platform(unittest.TestCase):
     def test_posts_edit_drafts_delete_and_markdown(self):
         url=self.create_post(status='draft')
         self.assertEqual(self.visitor.request(url)['status'],404)
-        self.assertNotIn('Mi entrada',self.visitor.request('/'+self.name)['body'])
+        self.assertNotIn('Mi entrada',self.visitor.request('/'+self.name+'/blogs')['body'])
         body=self.owner.request(url)['body'];postid=re.search(r'/edit/(\d+)',body)[1]
         self.owner.request('/'+self.name+'/edit/'+postid)
         error=self.owner.post('/'+self.name+'/edit/'+postid,title='',body='keep my text',section_id='',status='published')
@@ -193,7 +193,7 @@ class Platform(unittest.TestCase):
         self.assertEqual(style['body'],css)
         self.assertIn('Content-Type: text/css; charset=utf-8',style['headers'])
         section=self.create_section();url=self.create_post(section=section)
-        for path in ['/'+self.name,'/'+self.name+'/diario',url]:
+        for path in ['/'+self.name,'/'+self.name+'/blogs','/'+self.name+'/diario',url]:
             response=self.visitor.request(path)
             self.assertIn('href="/'+self.name+'/style.css"',response['body'])
             csp=next(h for h in response['headers'] if h.startswith('Content-Security-Policy:'))
@@ -202,8 +202,10 @@ class Platform(unittest.TestCase):
         management=self.owner.request('/manage/appearance')
         self.assertIn('sandbox="allow-same-origin"',management['body'])
         self.assertNotIn('href="/'+self.name+'/style.css"',management['body'])
+        self.owner.request('/manage/sections/home')
+        self.assertEqual(self.owner.post('/manage/sections/home',content='**Inicio de prueba**')['status'],303)
         preview=self.owner.request('/'+self.name+'/preview')
-        self.assertEqual(preview['status'],200);self.assertNotIn('blog-owner',preview['body']);self.assertIn('Mi entrada',preview['body'])
+        self.assertEqual(preview['status'],200);self.assertNotIn('blog-owner',preview['body']);self.assertIn('<strong>Inicio de prueba</strong>',preview['body'])
         self.assertEqual(self.visitor.request('/'+self.name+'/preview')['status'],403)
         self.owner.request('/manage/appearance/restore')
         self.assertEqual(self.owner.post('/manage/appearance/restore')['status'],303)
@@ -213,12 +215,12 @@ class Platform(unittest.TestCase):
         self.owner.request('/manage/settings')
         self.assertEqual(self.owner.post('/manage/settings',title='Privado',description='secreto',visibility='private')['status'],303)
         other=Client(self.env,'other-private');other.register('private-other')
-        for path in ['/'+self.name,'/'+self.name+'/diario',url,'/'+self.name+'/style.css','/'+self.name+'/preview']:
+        for path in ['/'+self.name,'/'+self.name+'/blogs','/'+self.name+'/inicio','/'+self.name+'/diario',url,'/'+self.name+'/style.css','/'+self.name+'/preview']:
             for client in [self.visitor,other]:
                 response=client.request(path);self.assertEqual(response['status'],404)
                 self.assertNotIn('secreto',response['body'])
                 self.assertIn('Cache-Control: no-store, private',response['headers'])
-            self.assertEqual(self.owner.request(path)['status'],200)
+            self.assertEqual(self.owner.request(path)['status'],308 if path.endswith('/inicio') else 200)
     def test_account_deletion_and_old_sessions(self):
         section=self.create_section();url=self.create_post(section=section)
         second=Client(self.env,'second-session');second.request('/login');second.post('/login',username=self.name,password='una contraseña larga')
@@ -270,14 +272,46 @@ class Platform(unittest.TestCase):
             self.assertEqual(self.owner.post('/manage/settings/delete',password='wrong',confirmation=self.name)['status'],422)
         self.assertEqual(self.owner.post('/manage/settings/delete',password='una contraseña larga',confirmation=self.name)['status'],429)
         self.assertEqual(self.visitor.request('/'+self.name)['status'],200)
+    def test_homepage_is_one_editable_text_and_blogs_is_feed(self):
+        home=self.visitor.request('/'+self.name)
+        self.assertIn('href="/'+self.name+'/blogs">blogs</a>',home['body'])
+        self.assertNotIn('blog-post-list',home['body'])
+        self.assertNotIn('/manage/sections/home',home['body'])
+        self.assertIn('/manage/sections/home',self.owner.request('/'+self.name)['body'])
+        management=self.owner.request('/manage/sections')['body']
+        self.assertIn('inicio',management);self.assertIn('blogs',management)
+        self.assertIn('0 de 10',management)
+        self.owner.request('/manage/sections/home')
+        self.assertEqual(self.owner.request('/manage/sections/home','POST',{'csrf':'bad','content':'stolen'})['status'],403)
+        content='# Mi inicio\n\n**bienvenido** <script>bad</script>'
+        saved=self.owner.post('/manage/sections/home',content=content)
+        self.assertEqual(saved['status'],303);self.assertEqual(saved['location'],'/'+self.name)
+        self.create_post(title='Publicación visible')
+        self.create_post(title='Borrador oculto',status='draft')
+        home=self.visitor.request('/'+self.name)['body']
+        self.assertIn('<strong>bienvenido</strong>',home);self.assertNotIn('<script>',home)
+        self.assertNotIn('Publicación visible',home)
+        feed=self.visitor.request('/'+self.name+'/blogs')['body']
+        self.assertIn('<h2>blogs</h2>',feed);self.assertIn('Publicación visible',feed)
+        self.assertNotIn('Borrador oculto',feed);self.assertNotIn('bienvenido',feed)
+        self.assertIn('Borrador oculto',self.owner.request('/'+self.name+'/blogs')['body'])
+        self.owner.request('/manage/sections/home')
+        self.assertEqual(self.owner.post('/manage/sections/home',content='texto reemplazado')['status'],303)
+        updated=self.visitor.request('/'+self.name)['body']
+        self.assertIn('texto reemplazado',updated);self.assertNotIn('bienvenido',updated)
+        self.assertEqual(self.visitor.request('/manage/sections/home')['status'],401)
+        other=Client(self.env,'home-other');other.register('home-other')
+        self.assertNotIn('texto reemplazado',other.request('/home-other')['body'])
+        self.assertEqual(self.visitor.request('/'+self.name+'/inicio')['location'],'/'+self.name)
+
     def test_pagination_and_invalid_page(self):
         for index in range(21): self.create_post(title='Página '+str(index))
-        first=self.visitor.request('/'+self.name)
+        first=self.visitor.request('/'+self.name+'/blogs')
         self.assertEqual(len(re.findall(r'<li>',first['body'])),20)
         self.assertIn('?page=2',first['body'])
-        second=self.visitor.request('/'+self.name+'?page=2')
+        second=self.visitor.request('/'+self.name+'/blogs?page=2')
         self.assertEqual(len(re.findall(r'<li>',second['body'])),1)
-        bad=self.visitor.request('/'+self.name+'?page=-1')
+        bad=self.visitor.request('/'+self.name+'/blogs?page=-1')
         self.assertEqual(bad['status'],400)
         self.assertEqual(bad['body'].count('<!doctype html>'),1)
     def test_css_does_not_cross_blogs(self):
