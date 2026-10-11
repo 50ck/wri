@@ -137,7 +137,7 @@ function manage_settings(array $blog,?string $error=null): void {
         echo '<form method="post">';token_field();field('title','title',value('title',$blog['title']),'text',true,120);field('description','description',value('description',$blog['description']),'text',false,280);
         echo '<label for="visibility">'.e(t('visibility')).'</label><select name="visibility" id="visibility">';
         foreach (['public','private'] as $state) echo '<option value="'.$state.'"'.(value('visibility',$blog['visibility'])===$state?' selected':'').'>'.e(t($state)).'</option>';
-        echo '</select><small>'.e(t('privacy_help')).'</small><div class="actions">';button('save');echo '</div></form><p>'.link_to('/manage/settings/delete','delete_blog').'</p>';
+        echo '</select><div class="actions">';button('save');echo '</div></form><p>'.link_to('/manage/settings/delete','delete_blog').'</p>';
     },$error,$blog);
 }
 function delete_blog_form(array $blog,?string $error=null): void {
