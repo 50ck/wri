@@ -106,7 +106,7 @@ class Platform(unittest.TestCase):
         self.assertEqual(home['body'].count('home only'),1)
         self.assertIn('href="/_addons/admin-probe/style.css"',home['body'])
         self.assertIn('href="/_addons/home-probe/style.css"',home['body'])
-        csp=next(h for h in home['headers'] if h.startswith('Content-Security-Policy:'))
+        csp=next(h for h in reversed(home['headers']) if h.startswith('Content-Security-Policy:'))
         self.assertIn('/_addons/admin-probe/style.css',csp)
         self.assertIn("script-src 'none'",csp)
         for path in ['/login','/register','/manage/addons','/manage/settings']:

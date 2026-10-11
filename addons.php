@@ -11,6 +11,7 @@ function addons(?string $type=null): array {
             try {
                 $addon=(static fn($path)=>require $path)($file);
                 if (!is_array($addon) || ($addon['api']??null)!==1 || !is_string($addon['label']['es']??null) || !in_array($addon['type']??null,['user','admin'],true)) throw new RuntimeException('Invalid addon');
+                foreach (['slots','routes'] as $map) if (isset($addon[$map]) && !is_array($addon[$map])) throw new RuntimeException('Invalid callback map');
                 foreach (['parser','render','request_finished'] as $hook) if (isset($addon[$hook]) && !is_callable($addon[$hook])) throw new RuntimeException('Invalid callback');
                 if ($addon['type']==='user' && isset($addon['request_finished'])) throw new RuntimeException('Admin callback required');
                 $slots=$addon['type']==='admin' ? ['nav','post_after','home_after'] : ['nav','post_after'];
