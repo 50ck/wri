@@ -76,7 +76,7 @@ function markdown(string $body,?array $blog=null): string {
     foreach ($headings as $heading) {
         $base=mb_strtolower(trim($heading->textContent),'UTF-8');
         $base=preg_replace('/[^\p{L}\p{N}\p{M}_\s-]/u','',$base);
-        $base=preg_replace('/\s+/u','-',$base) ?: 'seccion';
+        $base=preg_replace('/\s+/u','-',$base) ?: 'section';
         $id=$base; $suffix=1;
         while (isset($used[$id])) $id=$base.'-'.$suffix++;
         $used[$id]=true; $targets[$base]??=$id; $targets[$id]??=$id;

@@ -147,12 +147,12 @@ function slug_base(string $title): string {
     $title=strtr(mb_strtolower($title,'UTF-8'),['á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','ü'=>'u','ñ'=>'n']);
     $slug=trim(preg_replace('/[^a-z0-9]+/', '-', $title), '-');
     $slug=trim(substr($slug,0,60),'-');
-    if ($slug==='' || in_array($slug,reserved_names(),true)) $slug='entrada';
+    if ($slug==='' || in_array($slug,reserved_names(),true)) $slug='post';
     return $slug;
 }
 function free_section_slug(int $blog, string $title): string {
     $base=slug_base($title);
-    if (in_array($base,section_reserved_names(),true)) $base='seccion';
+    if (in_array($base,section_reserved_names(),true)) $base='section';
     $slug=$base; $i=2;
     while (one('SELECT id FROM sections WHERE blog_id=? AND slug=?',[$blog,$slug])) $slug=$base.'-'.$i++;
     return $slug;

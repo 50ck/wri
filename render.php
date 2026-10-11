@@ -18,7 +18,7 @@ function page(string $key,callable $content,?string $error=null,?array $manageme
     if ($key==='brand') foreach (addons('admin') as $id=>$extension) if (isset($extension['slots']['home_after'])) $styles[]=$id;
     $styles=array_filter(array_unique($styles),static fn($id)=>isset(addons('admin')[$id]['style']));
     headers_for(addonStyles:$styles);
-    echo '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e(t($key)).' · '.e(t('brand')).'</title><link rel="stylesheet" href="/assets/base.css">';
+    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e(t($key)).' · '.e(t('brand')).'</title><link rel="stylesheet" href="/assets/base.css">';
     foreach ($styles as $id) echo '<link rel="stylesheet" href="/_addons/'.e($id).'/style.css">';
     echo '</head><body><a class="skip" href="#main">'.e(t('skip')).'</a>';
     if ($management) {
@@ -53,7 +53,7 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
         foreach ($doc->getElementsByTagName('img') as $image) $images[]=$image->getAttribute('src');
     }
     headers_for($blog,$preview,images:$images); $owner=is_owner($blog) && !$preview;
-    echo '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e(($post['title'] ?? $section['title'] ?? $blog['title'])).'</title><link rel="stylesheet" href="/'.e($blog['username']).'/style.css"></head><body class="blog"><header class="blog-header"><h1 class="blog-title"><a href="/'.e($blog['username']).'">'.e($blog['title']).'</a></h1>';
+    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e(($post['title'] ?? $section['title'] ?? $blog['title'])).'</title><link rel="stylesheet" href="/'.e($blog['username']).'/style.css"></head><body class="blog"><header class="blog-header"><h1 class="blog-title"><a href="/'.e($blog['username']).'">'.e($blog['title']).'</a></h1>';
     if ($blog['description']!=='') echo '<p class="blog-description">'.e($blog['description']).'</p>';
     echo '<nav class="blog-nav" aria-label="'.e(t('sections')).'">'.link_to('/'.$blog['username'],'home').' '.link_to('/'.$blog['username'].'/blogs','blogs');
     foreach (section_list($blog['id']) as $item) echo '<a href="/'.e($blog['username']).'/'.e($item['slug']).'">'.e($item['title']).'</a>';
@@ -158,7 +158,7 @@ function manage_addons(array $blog,?string $error=null): void {
         $installed=addons('user');$active=active_addons($blog);
         if (!$installed) { echo '<p>'.e(t('addons_empty')).'</p>';return; }
         echo '<form method="post" action="/manage/addons">';token_field();
-        foreach ($installed as $id=>$addon) echo '<p><label><input type="checkbox" name="addons[]" value="'.e($id).'"'.(isset($active[$id])?' checked':'').'> '.e($addon['label']['es']).'</label></p>';
+        foreach ($installed as $id=>$addon) echo '<p><label><input type="checkbox" name="addons[]" value="'.e($id).'"'.(isset($active[$id])?' checked':'').'> '.e($addon['label']['en']).'</label></p>';
         echo '<div class="actions">';button('save');echo '</div></form>';
     },$error,$blog);
 }

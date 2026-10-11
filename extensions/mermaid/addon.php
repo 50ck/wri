@@ -2,7 +2,7 @@
 declare(strict_types=1);
 return [
     'api'=>1, 'type'=>'user',
-    'label'=>['es'=>'diagramas mermaid'],
+    'label'=>['en'=>'Mermaid diagrams'],
     'default'=>true,
     'style'=>__DIR__.'/style.css',
     'render'=>static function (DOMDocument $doc,array $context): void {

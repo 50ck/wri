@@ -2,7 +2,7 @@
 declare(strict_types=1);
 return [
     'api'=>1, 'type'=>'user',
-    'label'=>['es'=>'fórmulas'],
+    'label'=>['en'=>'formulas'],
     'default'=>true,
     'style'=>__DIR__.'/style.css',
     'parser'=>static function (AddonMarkdown $parser): void {

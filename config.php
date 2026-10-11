@@ -6,7 +6,7 @@ function config(): array {
     $root = __DIR__;
     $config = [
         'site_name' => getenv('BLOG_SITE_NAME') ?: 'blogs.',
-        'site_description' => getenv('BLOG_SITE_DESCRIPTION') ?: 'un pequeño lugar para escribir en internet',
+        'site_description' => getenv('BLOG_SITE_DESCRIPTION') ?: 'a little place to write on the internet',
         'base_url' => rtrim(getenv('BLOG_BASE_URL') ?: 'http://localhost:8080', '/'),
         'database' => getenv('BLOG_DATABASE') ?: "$root/storage/blog.sqlite",
         'session_path' => getenv('BLOG_SESSION_PATH') ?: "$root/storage/sessions",
