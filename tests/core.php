@@ -156,7 +156,7 @@ try {
     check(str_contains($mathematics,'penalización') && str_contains($mathematics,'suavidad'),'Unicode formula annotations preserved');
     $delimiters=markdown('Inline $x^2$ and \(\frac{1}{2}\).'."\n\n".'\[\sqrt{x}\]'."\n\n".'$$x+1$$'."\n\n```math\nx^2\n```");
     check(substr_count($delimiters,'<math ')===5,'Dollar, parenthesis, bracket and math-fence delimiters');
-    $literal=markdown('Precio: $5 y $10. Literal: \$x$. ` $x^2$ `'."\n\n```text\n$x+1$\n$$x$$\n```");
+    $literal=markdown('Precio: $5 y $10.'."\n\n".'Literal: \$x\$. ` $x^2$ `'."\n\n```text\n\$x+1\$\n\$\$x\$\$\n```");
     check(!str_contains($literal,'<math ') && str_contains($literal,'$5 y $10'),'Currency, escaped dollars and code remain literal');
     check(str_contains(markdown("$$\nx+1"),'$$') && !str_contains(markdown("$$\nx+1"),'<math '),'Unclosed display delimiter preserves source');
     check(math_element(new DOMDocument(),str_repeat('{',49).'x'.str_repeat('}',49),'inline')===null && math_element(new DOMDocument(),str_repeat('x',4097),'inline')===null,'Formula depth and size limits');
