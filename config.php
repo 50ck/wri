@@ -36,28 +36,8 @@ function section_reserved_names(): array { return array_merge(reserved_names(), 
 function t(string $key): string {
     if ($key==='brand') return config()['site_name'];
     if ($key==='intro') return config()['site_description'];
-    static $strings = [
-        'username'=>'nombre de usuario', 'create_blog'=>'crear blog',
-        'or'=>'o', 'sign_up'=>'registrarme', 'login'=>'entrar', 'logout'=>'salir', 'register'=>'crear tu blog', 'password'=>'contraseña', 'confirm_password'=>'repetir contraseña',
-        'password_help'=>'min 12 caracteres', 'username_help'=>'min 3 letras',
-        'home'=>'inicio', 'manage'=>'gestionar', 'sections'=>'secciones', 'appearance'=>'apariencia', 'settings'=>'ajustes', 'addons'=>'addons', 'addons_empty'=>'no hay addons instalados', 'blog'=>'ver blog', 'new_post'=>'nueva entrada',
-        'edit'=>'editar', 'delete'=>'eliminar', 'title'=>'título', 'description'=>'descripción breve', 'section'=>'sección', 'unsectioned'=>'sin sección', 'content'=>'contenido Markdown',
-        'save'=>'guardar', 'draft'=>'borrador', 'save_draft'=>'guardar borrador', 'publish'=>'publicar', 'empty'=>'todavía no hay entradas', 'blogs'=>'blogs', 'edit_home'=>'editar inicio',
-        'previous'=>'anterior', 'next'=>'siguiente', 'cancel'=>'cancelar', 'confirm'=>'confirmar', 'new_section'=>'nueva sección', 'intro_content'=>'introducción Markdown (opcional)',
-        'up'=>'subir', 'down'=>'bajar', 'delete_post'=>'¿eliminar esta entrada?', 'delete_post_help'=>'la entrada dejará de estar disponible; se conserva en la base de datos hasta eliminar la cuenta',
-        'delete_section'=>'¿eliminar esta sección?', 'delete_section_help'=>'sus entradas se conservarán y pasarán a «sin sección»; los enlaces anteriores redirigirán a su nueva dirección',
-        'css'=>'style.css', 'apply'=>'aplicar', 'restore'=>'restaurar CSS predeterminado', 'restore_help'=>'se reemplazará tu CSS; tus entradas y secciones se conservarán',
-        'preview'=>'vista previa', 'css_help'=>'hasta 64 KiB; no se permiten recursos externos; la política del navegador bloquea imágenes, fuentes e importaciones externas',
-        'public'=>'público', 'private'=>'privado', 'visibility'=>'visibilidad', 'delete_blog'=>'eliminar blog y cuenta', 'delete_blog_help'=>'se eliminarán permanentemente tu cuenta, blog, entradas, secciones y estilos; las copias de seguridad se conservan según la política del servidor',
-        'type_username'=>'escribe tu nombre de usuario', 'delete_permanently'=>'eliminar permanentemente', 'saved'=>'guardado', 'published'=>'publicado', 'section_created'=>'sección creada',
-        'deleted'=>'eliminado', 'css_restored'=>'css restaurado', 'not_found'=>'no se encuentra esta página', 'unavailable'=>'este blog no está disponible', 'invalid'=>'solicitud no válida',
-        'username_error'=>'nombre no válido o reservado', 'username_taken'=>'este nombre ya está ocupado', 'text_error'=>'revisa los campos y su longitud',
-        'password_min'=>'minimo 12 caracteres', 'password_null'=>'sin caracteres nulos', 'password_max'=>'máximo {n} caracteres', 'confirmation_error'=>'las contraseñas no coinciden',
-        'login_error'=>'nombre o contraseña incorrectos', 'login_required'=>'necesitas entrar para acceder', 'csrf_error'=>'el formulario ha caducado; vuelve a cargar la página',
-        'forbidden'=>'no tienes permiso', 'rate_error'=>'demasiados intentos; inténtalo más tarde', 'too_large'=>'el contenido supera el tamaño permitido', 'section_limit'=>'puedes tener como máximo diez secciones',
-        'post_limit'=>'has alcanzado el límite de entradas', 'delete_error'=>'la contraseña o el nombre de confirmación no son correctos', 'registration_closed'=>'el registro está cerrado',
-        'method_error'=>'método no permitido', 'server_error'=>'no se pudo completar la solicitud', 'error'=>'error', 'skip'=>'ir al contenido', 'edit_post'=>'editar entrada',
-        'edit_section'=>'editar sección', 'section_count'=>'de 10', 'table'=>'tabla', 'diagram'=>'diagrama', 'formula'=>'fórmula matemática', 'flowchart'=>'diagrama de flujo', 'diagram_unsupported'=>'no se pudo dibujar este diagrama; se muestra su código', 'alert_note'=>'nota', 'alert_tip'=>'consejo', 'alert_warning'=>'aviso', 'date'=>'fecha', 'status'=>'estado', 'privacy_help'=>'un blog privado solo puede leerse desde tu cuenta',
-    ];
+    static $strings;
+    $strings ??= parse_ini_file(__DIR__.'/strings.txt', false, INI_SCANNER_RAW);
+    if ($strings === false) throw new RuntimeException('Cannot read strings.txt');
     return $strings[$key] ?? throw new LogicException('Missing translation: '.$key);
 }

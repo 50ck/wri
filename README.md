@@ -174,7 +174,7 @@ Deletion does **not** erase already taken backups. Set and communicate a finite 
 
 ## Deliberate limits
 
-One blog/account; ten sections; no username changes, custom HTML/JavaScript, media, comments, RSS, API or email recovery. No CSS revision history, static export or shared page cache. Source strings are centralized in `config.php`. Private blogs are owner-only and share the same backend authorization on all endpoints. Previously viewed or downloaded public content cannot be recalled from visitors when privacy changes. SQLite serializes writes; tune PHP-FPM capacity and hash cost for the actual machine before opening public registration.
+One blog/account; ten sections; no username changes, custom HTML/JavaScript, media, comments, RSS, API or email recovery. No CSS revision history, static export or shared page cache. Interface strings are centralized in `strings.txt` (UTF-8, `key = "text"` format). Edit values while preserving keys and quotes; changes apply on the next request. Preserve placeholders such as `{n}`. Site name and description remain configurable in `config.php`; addon labels live in their descriptors, and user content remains in SQLite. Private blogs are owner-only and share the same backend authorization on all endpoints. Previously viewed or downloaded public content cannot be recalled from visitors when privacy changes. SQLite serializes writes; tune PHP-FPM capacity and hash cost for the actual machine before opening public registration.
 
 ## Addons and compact layout
 
