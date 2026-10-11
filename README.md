@@ -99,6 +99,7 @@ The customizable stylesheet is served as `text/css` with `nosniff`, never embedd
 .blog-section
 .blog-footer
 .blog-owner
+.blog-settings
 ```
 
 ## Data and routes
