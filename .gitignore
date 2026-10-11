@@ -2,3 +2,6 @@
 !/storage/.gitkeep
 /config/local.php
 *.log
+
+__pycache__/
+*.pyc

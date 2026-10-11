@@ -124,9 +124,17 @@ Primary routes are `/`, `/register`, `/login`, POST `/logout`, `/{username}`, `/
 ./bin/test.sh --http
 ```
 
+Optional browser audit (requires Firefox and a running local server):
+
+```sh
+python3 tests/browser.py http://localhost:8080/avz
+```
+
+It opens an isolated temporary Firefox profile with website JavaScript disabled, checks column overflow and internal anchors at three widths, performs a native link click, and writes a screenshot to `/tmp/blog-browser-audit.png`. Marionette is used only for test instrumentation, following the [Mozilla protocol](https://firefox-source-docs.mozilla.org/remote/marionette/Protocol.html). The temporary browser/profile are removed afterward.
+
 The default suite runs 81 core checks and 19 integration scenarios through the real front controller, PDO database and file sessions using a socket-free CLI harness. The concurrency check starts twelve independent PHP processes against one database and requires exactly ten section creations to succeed. The HTTP mode runs the same integration scenarios against the PHP development server using native Python HTTP/cookie handling. Neither mode requires a test framework or frontend dependencies. Test storage is isolated under temporary directories. Test-only Argon2 parameters are reduced for speed.
 
-Core/request tests and local HTTP integration tests have been executed. Local sockets require execution outside the restricted sandbox. Working `doas`, Nginx and PHP-FPM were unavailable in that environment. Browser presentation/CSP enforcement and Nginx/FPM deployment still need verification on the target server; no browser or production-server test result is claimed.
+Core/request tests, local HTTP integration tests and a Firefox layout/anchor audit with website JavaScript disabled have been executed. Local sockets require execution outside the restricted sandbox. Working `doas`, Nginx and PHP-FPM were unavailable in that environment. The browser audit checked /avz at 500, 768 and 1280 pixels: no page-wide horizontal overflow, all internal heading links resolved, and a native click reached its heading. Complete CSP enforcement and Nginx/FPM deployment still need verification on the target server; no production-server test result is claimed.
 
 ## Backups, deletion and recovery
 
