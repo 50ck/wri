@@ -8,7 +8,7 @@ function route_index(string $path): void {
         if (isset($_GET['username'])) { try { $name=username(input('username',$_GET));redirect('/register?username='.rawurlencode($name)); } catch(HttpError $e) { $error=$e->getMessage();http_response_code($e->status); } }
         page('brand',function () {
             echo '<p>'.e(t('intro')).'</p>';
-            if (config()['registration']) { echo '<form method="get" action="/"><p>'.e(parse_url(config()['base_url'],PHP_URL_HOST)).'/</p>';field('username','username',input('username',$_GET),'text',true,24);echo '<div class="actions">';button('create_blog');echo '</div></form>'; }
+            if (config()['registration']) { echo '<form method="get" action="/">';field('username','username',input('username',$_GET),'text',true,24);echo '<div class="actions">';button('create_blog');echo '</div></form>'; }
             echo '<p>'.e(t('have_account')).' '.link_to('/login','login').'</p>';
         },$error);return;
     }

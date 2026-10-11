@@ -56,6 +56,8 @@ Environment variables or a private PHP file specified by `BLOG_CONFIG` configure
 
 | Environment | Private key | Default |
 | --- | --- | --- |
+| `BLOG_SITE_NAME` | `site_name` | `blogs.` |
+| `BLOG_SITE_DESCRIPTION` | `site_description` | `un pequeño lugar para escribir en internet` |
 | `BLOG_BASE_URL` | `base_url` | `http://localhost:8080` |
 | `BLOG_DATABASE` | `database` | `storage/blog.sqlite` |
 | `BLOG_SESSION_PATH` | `session_path` | `storage/sessions` |

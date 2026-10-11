@@ -16,11 +16,10 @@ function button(string $key,?string $name=null,?string $value=null): void { echo
 function page(string $key,callable $content,?string $error=null,?array $management=null): void {
     headers_for();
     echo '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e(t($key)).' · '.e(t('brand')).'</title><link rel="stylesheet" href="/assets/base.css"></head><body><a class="skip" href="#main">'.e(t('skip')).'</a>';
-    echo '<header>'.($key==='brand'?'':link_to('/','brand'));
     if ($management) {
-        echo '<p>'.e(t('manage')).' / '.e($management['username']).'</p><nav aria-label="'.e(t('manage')).'">'.link_to('/manage/sections','sections').' '.link_to('/manage/appearance','appearance').' '.link_to('/manage/settings','settings').' '.link_to('/manage/addons','addons').'</nav><div class="actions">'.link_to('/'.$management['username'],'blog').'<form class="inline" method="post" action="/logout">';token_field();button('logout');echo '</form></div>';
+        echo '<header><p>'.e(t('manage')).' / '.e($management['username']).'</p><nav aria-label="'.e(t('manage')).'">'.link_to('/manage/sections','sections').' '.link_to('/manage/appearance','appearance').' '.link_to('/manage/settings','settings').' '.link_to('/manage/addons','addons').'</nav><div class="actions">'.link_to('/'.$management['username'],'blog').'<form class="inline" method="post" action="/logout">';token_field();button('logout');echo '</form></div></header>';
     }
-    echo '</header><main id="main"><h1>'.e(t($key)).'</h1>';
+    echo '<main id="main"><h1>'.e(t($key)).'</h1>';
     if ($error) echo '<p class="error" role="alert">'.e($error).'</p>';
     if (isset($_SESSION['flash'])) { echo '<p class="feedback" role="status">'.e(t($_SESSION['flash'])).'</p>'; unset($_SESSION['flash']); }
     $content(); echo '</main></body></html>';
@@ -30,10 +29,11 @@ function auth_form(string $kind,?string $error=null): void {
     page($kind,function () use ($kind) {
         echo '<form method="post" action="/'.$kind.'">'; token_field();
         field('username','username',value('username',input('username',$_GET)),'text',true,24);
-        echo '<small>'.e(t('username_help')).'</small>';
+        if ($kind==='register') echo '<small>'.e(t('username_help')).'</small>';
         field($kind==='register'?'new_password':'password','password','','password');
         if ($kind==='register') { field('confirm_password','confirm_password','','password'); echo '<small>'.e(t('password_help')).'</small>'; }
-        echo '<div class="actions">';button($kind);echo '</div></form><p>'.link_to($kind==='register'?'/login':'/register',$kind==='register'?'login':'create_blog').'</p>';
+        echo '<div class="actions">';button($kind);echo '</div></form>';
+        if ($kind==='register') echo '<p>'.link_to('/login','login').'</p>';
     },$error);
 }
 function icon_link(string $path,string $key,string $shape): void {
@@ -82,7 +82,7 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
         $base='/'.$blog['username'].($section?'/'.$section['slug']:'/blogs');
         echo '<nav aria-label="'.e(t('next')).'">';if ($page>1) echo link_to($base.'?page='.($page-1),'previous');if ($more) echo ' '.link_to($base.'?page='.($page+1),'next');echo '</nav>';
     }
-    echo '</main><footer class="blog-footer">'.link_to('/','brand').'</footer>';
+    echo '</main>';
     if ($owner) { echo '<div class="blog-settings">';icon_link('/manage','settings','settings');echo '</div>'; }
     echo '</body></html>';
 }
