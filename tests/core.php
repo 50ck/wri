@@ -15,6 +15,12 @@ try {
     foreach (['ab','a--bc','-abc','abc-','a b c','Álvaro','admin','posts','manage','assets'] as $bad) rejects(fn()=>username($bad),422);
     rejects(fn()=>register_account('valid','password long enough','different'),422);
     rejects(fn()=>validate_password(str_repeat('é',513),str_repeat('é',513)),422);
+    foreach ([['corta','minimo 12 caracteres'], ["\0",'sin caracteres nulos'], [str_repeat('a',1025),'máximo 1024 caracteres'], [str_repeat('é',513),'máximo 512 caracteres']] as [$password,$message]) {
+        try { validate_password($password,$password); throw new RuntimeException('Expected password rejection'); }
+        catch (HttpError $e) { check($e->status===422 && $e->getMessage()===$message,'Specific password error'); }
+    }
+    validate_password(str_repeat('é',512),str_repeat('é',512));
+    check(true,'Password at UTF-8 byte limit');
     $long=str_repeat('字',200);check(password_check($long,password_make($long)),'Unicode long password');
     db()->exec("CREATE TRIGGER break_blog BEFORE INSERT ON blogs BEGIN SELECT RAISE(ABORT,'test'); END");
     try {register_account('broken','password long enough','password long enough');throw new RuntimeException('Expected rollback');}catch(PDOException){}

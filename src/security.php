@@ -26,7 +26,14 @@ function markdown_field(string $value): string {
     return $value;
 }
 function validate_password(string $password, string $confirm): void {
-    if (!mb_check_encoding($password, 'UTF-8') || mb_strlen($password, 'UTF-8') < 12 || strlen($password) > 1024 || str_contains($password, "\0")) fail(422, 'password_error');
+    if (!mb_check_encoding($password, 'UTF-8')) fail(422, 'invalid');
+    if (str_contains($password, "\0")) fail(422, 'password_null');
+    if (mb_strlen($password, 'UTF-8') < 12) fail(422, 'password_min');
+    if (strlen($password) > 1024) {
+        // Express the byte cap as the number of characters that fit in this password's prefix.
+        $max = mb_strlen(mb_strcut($password, 0, 1024, 'UTF-8'), 'UTF-8');
+        throw new HttpError(422, str_replace('{n}', (string)$max, t('password_max')));
+    }
     if (!hash_equals($password, $confirm)) fail(422, 'confirmation_error');
 }
 function password_make(string $password): string {

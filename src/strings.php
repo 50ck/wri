@@ -17,7 +17,7 @@ function t(string $key): string {
         'type_username'=>'escribe tu nombre de usuario', 'delete_permanently'=>'eliminar permanentemente', 'saved'=>'guardado.', 'published'=>'publicado.', 'section_created'=>'sección creada.',
         'deleted'=>'eliminado.', 'css_restored'=>'css restaurado.', 'not_found'=>'no se encuentra esta página.', 'unavailable'=>'este blog no está disponible.', 'invalid'=>'solicitud no válida.',
         'username_error'=>'nombre no válido o reservado.', 'username_taken'=>'este nombre ya está ocupado.', 'text_error'=>'revisa los campos y su longitud.',
-        'password_error'=>'la contraseña debe tener al menos 12 caracteres y como máximo 1024 bytes UTF-8, sin caracteres nulos.', 'confirmation_error'=>'las contraseñas no coinciden.',
+        'password_min'=>'minimo 12 caracteres', 'password_null'=>'sin caracteres nulos', 'password_max'=>'máximo {n} caracteres', 'confirmation_error'=>'las contraseñas no coinciden.',
         'login_error'=>'nombre o contraseña incorrectos.', 'login_required'=>'necesitas entrar para acceder.', 'csrf_error'=>'el formulario ha caducado. vuelve a cargar la página.',
         'forbidden'=>'no tienes permiso.', 'rate_error'=>'demasiados intentos. inténtalo más tarde.', 'too_large'=>'el contenido supera el tamaño permitido.', 'section_limit'=>'puedes tener como máximo diez secciones.',
         'post_limit'=>'has alcanzado el límite de entradas.', 'delete_error'=>'la contraseña o el nombre de confirmación no son correctos.', 'registration_closed'=>'el registro está cerrado.',
