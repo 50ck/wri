@@ -57,6 +57,17 @@ function sanitize_diagram_svg(string $svg,string $source): ?string {
     if (!preg_match('/\A[-+0-9.eE ]+\z/',$view)) return null;
     $numbers=preg_split('/\s+/',trim($view));
     if (count($numbers)!==4 || (float)$numbers[2]<=0 || (float)$numbers[3]<=0 || (float)$numbers[2]>50000 || (float)$numbers[3]>50000) return null;
+    // Remove only the canvas rectangle; retain node boxes and label backgrounds.
+    foreach (iterator_to_array($root->childNodes) as $child) {
+        if (!$child instanceof DOMElement || $child->tagName!=='rect') continue;
+        $coversCanvas=true;
+        foreach (['x','y','width','height'] as $index=>$attribute) {
+            $value=$child->hasAttribute($attribute) ? $child->getAttribute($attribute) : ($index<2 ? '0' : '');
+            if (!is_numeric($value) || abs((float)$value-(float)$numbers[$index])>.001) { $coversCanvas=false;break; }
+        }
+        if ($coversCanvas) $root->removeChild($child);
+        break;
+    }
     $root->setAttribute('class','mermaid-diagram mermaid-native');$root->setAttribute('role','img');$root->setAttribute('aria-label',t('diagram'));
     $root->setAttribute('width',$numbers[2]);$root->setAttribute('height',$numbers[3]);
     $title=$out->createElement('title');$title->appendChild($out->createTextNode(t('diagram')));$root->insertBefore($title,$root->firstChild);

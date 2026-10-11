@@ -170,6 +170,10 @@ try {
     check($clean!==null && !preg_match('/<(?:script|foreignObject|image|style|a)\b|onload=|href=|style=|url\(https:/i',$clean),'Native SVG removes active elements, links, styles and resource references');
     check(sanitize_diagram_svg('<!DOCTYPE svg [<!ENTITY x SYSTEM "file:///etc/passwd">]><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">&x;</svg>','')===null,'SVG entities and document types rejected');
     check(sanitize_diagram_svg('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100000 100"/>','')===null,'SVG dimensions bounded');
+    $transparent=sanitize_diagram_svg('<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -20 300 200"><rect x="-10" y="-20" width="300" height="200" fill="#333"/><rect x="20" y="30" width="80" height="40" fill="#242424"/></svg>','test');
+    $transparentDoc=new DOMDocument();$transparentDoc->loadXML($transparent);
+    check($transparentDoc->getElementsByTagName('rect')->length===1 && $transparentDoc->getElementsByTagName('rect')->item(0)->getAttribute('width')==='80','Canvas background removed without removing node boxes');
+    check($transparentDoc->documentElement->getAttribute('width')==='300' && $transparentDoc->documentElement->getAttribute('height')==='200','Intrinsic diagram dimensions retained');
     $markers='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><marker id="arrow"><path d="M0 0L1 1"/></marker></defs><path marker-end="url(#arrow)" d="M0 0L10 10"/></svg>';
     $first=sanitize_diagram_svg($markers,'first');$second=sanitize_diagram_svg($markers,'second');
     preg_match('/id="([^"]+)"/',$first,$firstId);preg_match('/id="([^"]+)"/',$second,$secondId);
