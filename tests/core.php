@@ -119,6 +119,31 @@ try {
     check(!str_contains(markdown("```js\n".$large."\n```"),'hljs-'),'Oversized code skips highlighting');
     $bounded=markdown(str_repeat("```js\n".str_repeat('const pato = "hola"; ',500)."\n```\n\n",8));
     check(substr_count($bounded,'<pre><code>const pato')===2,'Per-document highlighting budget');
+    $flow=file_get_contents(__DIR__.'/fixtures/flowchart.mmd');
+    $graph=mermaid_flowchart($flow);
+    check(count($graph['nodes'])===6 && count($graph['edges'])===6 && $graph['nodes']['B']['shape']==='diamond','Mermaid example parses all nodes and edges');
+    $diagram=markdown("```mermaid\n".$flow."```");
+    $svgDoc=new DOMDocument();$svgDoc->loadHTML('<?xml encoding="UTF-8">'.$diagram);$svgPath=new DOMXPath($svgDoc);
+    check($svgDoc->getElementsByTagName('svg')->length===1 && !$svgDoc->getElementsByTagName('pre')->length,'Mermaid fence becomes inline SVG');
+    check($svgPath->query('//g[@class="mermaid-node"]')->length===6 && $svgPath->query('//path[@class="mermaid-edge"]')->length===6 && $svgPath->query('//polygon[@class="mermaid-arrow"]')->length===6,'All flowchart nodes and arrowheads rendered');
+    check($svgPath->query('//g[@class="mermaid-node"]/polygon')->length===1 && str_contains($diagram,'¿Hay café?') && str_contains($diagram,'>Sí</text>') && str_contains($diagram,'>No</text>'),'Decision and labelled branches rendered');
+    check($svgPath->query('//div[@class="blog-diagram" and @role="region" and @tabindex="0"]')->length===1 && str_contains($diagram,'<desc>flowchart LR'),'Accessible diagram and source description');
+    $xmlDoc=new DOMDocument();check($xmlDoc->loadXML(mermaid_svg($flow)),'Generated SVG is valid XML');
+    foreach (['LR','RL','TB','TD','BT'] as $direction) check(mermaid_svg("graph ".$direction."; A(Inicio) --> B[Fin]; B --> A")!==null,'Flowchart direction '.$direction);
+    check(mermaid_svg("flowchart LR\nA --> A")!==null && mermaid_svg("flowchart TB\nA[Único nodo]")!==null,'Self loops and isolated nodes');
+    check(mermaid_flowchart("flowchart LR\n%% comentario\nA --> B --> C\nC[último]")['nodes']['C']['label']==='último','Chained arrows, comments and later node labels');
+    $attack=markdown('```mermaid'."\nflowchart LR\n".'A["<script>alert(1)</script>"] -->|<img src=x>| B["& café"]'."\n```");
+    $attackDoc=new DOMDocument();$attackDoc->loadHTML('<?xml encoding="UTF-8">'.$attack);$attackPath=new DOMXPath($attackDoc);
+    check($attackDoc->getElementsByTagName('svg')->length===1 && !$attackDoc->getElementsByTagName('script')->length && !$attackDoc->getElementsByTagName('img')->length && !$attackPath->query('//*[@href or @style or @onclick or @onerror]')->length,'Diagram labels cannot inject active SVG or HTML');
+    foreach (["sequenceDiagram\nA->>B: hola", "flowchart LR\nclick A \"https://evil.test\"", "flowchart LR\nA -->", "flowchart LR\nA[roto", "flowchart LR\nA[".str_repeat('a',121).']', str_repeat('a',8193)] as $invalid) {
+        check(mermaid_svg($invalid)===null,'Invalid or unsupported diagram safely rejected');
+        check(str_contains(markdown("```mermaid\n".$invalid."\n```"),'<pre><code>'),'Rejected diagram preserves source');
+    }
+    $tooMany="flowchart LR\n";for($i=0;$i<41;$i++)$tooMany.='N'.$i."\n";
+    check(mermaid_svg($tooMany)===null,'Diagram node limit');
+    check(mermaid_svg("flowchart LR\n".str_repeat("A --> B\n",81))===null,'Diagram edge limit');
+    check(substr_count(markdown(str_repeat("```mermaid\nflowchart LR\nA --> B\n```\n\n",9)),'class="mermaid-diagram"')===8,'Per-document diagram limit');
+    check(!str_contains(markdown("<svg onload=alert(1)><script>evil</script></svg>"),'<svg'),'Raw user SVG remains escaped');
     check(e('<"&')==='&lt;&quot;&amp;','HTML escaping');
     delete_post($blog,$post);rejects(fn()=>owned_post($blog,$post),404);
     rejects(fn()=>delete_account($blog,'wrong','alice'),422);
