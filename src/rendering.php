@@ -47,7 +47,6 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
     echo '<nav class="blog-nav" aria-label="'.e(t('sections')).'">'.link_to('/'.$blog['username'],'home').' '.link_to('/'.$blog['username'].'/blogs','blogs');
     foreach (section_list($blog['id']) as $item) echo '<a href="/'.e($blog['username']).'/'.e($item['slug']).'">'.e($item['title']).'</a>';
     echo '</nav></header>';
-    if ($owner) { echo '<div class="blog-owner">';icon_link('/'.$blog['username'].'/new','new_post','plus');icon_link('/manage','settings','settings');echo '</div>'; }
     echo '<main class="blog-main" id="main">';
     if ($owner && isset($_SESSION['flash'])) { echo '<p class="feedback" role="status">'.e(t($_SESSION['flash'])).'</p>'; unset($_SESSION['flash']); }
     if ($post) {
@@ -59,7 +58,11 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
         echo '</h2>'.markdown($blog['home_markdown']).'</article>';
     } else {
         if ($section) echo '<section class="blog-section"><h2>'.e($section['title']).'</h2>'.markdown($section['content_markdown']).'</section>';
-        else echo '<h2>'.e(t('blogs')).'</h2>';
+        else {
+            echo '<h2>'.e(t('blogs'));
+            if ($owner) { echo ' ';icon_link('/'.$blog['username'].'/new','new_post','plus'); }
+            echo '</h2>';
+        }
         $number=input('page',$_GET); if ($number!=='' && (!ctype_digit($number) || (int)$number<1 || (int)$number>10000)) fail(400,'invalid');
         $page=max(1,(int)$number); $sql='SELECT * FROM posts WHERE blog_id=? AND deleted_at IS NULL'; $params=[$blog['id']];
         if ($section) { $sql.=' AND section_id=?';$params[]=$section['id']; }
@@ -77,7 +80,9 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
         $base='/'.$blog['username'].($section?'/'.$section['slug']:'/blogs');
         echo '<nav aria-label="'.e(t('next')).'">';if ($page>1) echo link_to($base.'?page='.($page-1),'previous');if ($more) echo ' '.link_to($base.'?page='.($page+1),'next');echo '</nav>';
     }
-    echo '</main><footer class="blog-footer">'.link_to('/','brand').'</footer></body></html>';
+    echo '</main><footer class="blog-footer">'.link_to('/','brand').'</footer>';
+    if ($owner) { echo '<div class="blog-settings">';icon_link('/manage','settings','settings');echo '</div>'; }
+    echo '</body></html>';
 }
 function post_editor(array $blog,?array $post,?string $error=null): void {
     page($post?'edit_post':'new_post',function () use ($blog,$post) {

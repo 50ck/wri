@@ -108,7 +108,7 @@ class Platform(unittest.TestCase):
         mismatch=client.post('/register',username='available',new_password='una contraseña larga',confirm_password='diferente')
         self.assertEqual(mismatch['status'],422)
         self.assertEqual(self.visitor.request('/available')['status'],404)
-        self.assertIn('nueva entrada',self.owner.request('/'+self.name)['body'])
+        self.assertIn('editar inicio',self.owner.request('/'+self.name)['body'])
     def test_home_and_canonical_paths(self):
         response=self.visitor.request('/?username=New-Name')
         self.assertEqual(response['location'],'/register?username=new-name')
@@ -279,6 +279,10 @@ class Platform(unittest.TestCase):
         self.assertIn('href="/'+self.name+'/blogs">blogs</a>',home['body'])
         self.assertNotIn('blog-post-list',home['body'])
         self.assertNotIn('/manage/sections/home',home['body'])
+        self.assertNotIn('blog-settings',home['body'])
+        owner_home=self.owner.request('/'+self.name)['body']
+        self.assertNotIn('href="/'+self.name+'/new"',owner_home)
+        self.assertIn('<div class="blog-settings"><a href="/manage"',owner_home)
         self.assertRegex(self.owner.request('/'+self.name)['body'],r'<h2>inicio <a href="/manage/sections/home"[^>]*aria-label="editar inicio"[^>]*><svg[^>]*>.*?</svg></a></h2>')
         management=self.owner.request('/manage/sections')['body']
         self.assertIn('inicio',management);self.assertIn('blogs',management)
@@ -297,6 +301,7 @@ class Platform(unittest.TestCase):
         self.assertIn('<h2>blogs</h2>',feed);self.assertIn('Publicación visible',feed)
         self.assertNotIn('Borrador oculto',feed);self.assertNotIn('bienvenido',feed)
         self.assertIn('Borrador oculto',self.owner.request('/'+self.name+'/blogs')['body'])
+        self.assertRegex(self.owner.request('/'+self.name+'/blogs')['body'],r'<h2>blogs <a href="/'+self.name+r'/new"[^>]*aria-label="nueva entrada"[^>]*><svg[^>]*>.*?</svg></a></h2>')
         self.owner.request('/manage/sections/home')
         self.assertEqual(self.owner.post('/manage/sections/home',content='texto reemplazado')['status'],303)
         updated=self.visitor.request('/'+self.name)['body']
