@@ -77,7 +77,7 @@ class Platform(unittest.TestCase):
             sock=socket.socket();sock.bind(('127.0.0.1',0));port=sock.getsockname()[1];sock.close()
             cls.env['BLOG_BASE_URL']=cls.env['BLOG_TEST_HTTP']=f'http://127.0.0.1:{port}'
             cls.server_log=open(cls.temp.name+'/server.log','w')
-            cls.server=subprocess.Popen(PHP+['-S',f'127.0.0.1:{port}','-t','public','bin/dev-router.php'],cwd=ROOT,env=cls.env,stdout=cls.server_log,stderr=cls.server_log)
+            cls.server=subprocess.Popen(PHP+['-S',f'127.0.0.1:{port}','-t','public','bin/test-server.php'],cwd=ROOT,env=cls.env,stdout=cls.server_log,stderr=cls.server_log)
             for _ in range(100):
                 try:
                     urllib.request.urlopen(cls.env['BLOG_TEST_HTTP']+'/',timeout=1).close();break
