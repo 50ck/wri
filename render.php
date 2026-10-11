@@ -172,7 +172,7 @@ function manage_admin(array $blog,?string $error=null): void {
         if ($number!=='' && (!ctype_digit($number) || (int)$number<1 || (int)$number>10000)) fail(400,'invalid');
         $page=max(1,(int)$number);
         $users=query('SELECT u.id AS user_id,u.username,b.id,b.visibility FROM users u JOIN blogs b ON b.user_id=u.id ORDER BY u.id LIMIT 51 OFFSET ?',[($page-1)*50])->fetchAll();
-        $more=count($users)>50;echo '<ul class="section-list"><li>'.link_to('/manage/admin/users/new','create_user').'</li>';
+        $more=count($users)>50;echo '<p>'.link_to('/manage/admin/users/new','create_user').'</p><ul class="section-list">';
         foreach (array_slice($users,0,50) as $user) {
             echo '<li><a href="/'.e($user['username']).'">'.e($user['username']).'</a>';
             echo ' <span class="section-actions">';
