@@ -85,6 +85,16 @@ function current_user(): ?array {
     return isset($_SESSION['user_id']) ? one('SELECT * FROM users WHERE id=?', [$_SESSION['user_id']]) : null;
 }
 function require_user(): array { return current_user() ?? throw new HttpError(401, t('login_required')); }
+function platform_settings(): array { return one('SELECT * FROM platform WHERE id=1') ?? throw new RuntimeException('Run install.php'); }
+function is_admin(): bool { $user=current_user();return $user!==null && (int)$user['id']===(int)(platform_settings()['admin_user_id']??0); }
+function require_admin(): void { require_user();if (!is_admin()) fail(403,'forbidden'); }
+function save_platform_home(string $id): void {
+    require_admin();
+    transaction(static function () use($id) {
+        if ($id!=='' && (!ctype_digit($id) || !one("SELECT id FROM blogs WHERE id=? AND visibility='public'",[$id]))) fail(422,'invalid');
+        query('UPDATE platform SET homepage_blog_id=? WHERE id=1',[$id===''?null:(int)$id]);
+    });
+}
 function authenticate(int $id): void { session_regenerate_id(true); $_SESSION = ['user_id'=>$id,'issued'=>time(),'csrf'=>bin2hex(random_bytes(32))]; }
 function logout(): void {
     $_SESSION=[]; session_destroy();
@@ -133,6 +143,7 @@ function register_account(string $name, string $password, string $confirm): arra
             $id=(int)db()->lastInsertId();
             query('INSERT INTO blogs(user_id,title,created_at,updated_at) VALUES (?,?,?,?)',[$id,$name,$time,$time]);
             enable_default_addons((int)db()->lastInsertId());
+            query('UPDATE platform SET admin_user_id=?,admin_initialized=1 WHERE id=1 AND admin_initialized=0',[$id]);
             return ['id'=>$id,'username'=>$name];
         });
     } catch (PDOException $e) {

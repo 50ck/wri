@@ -25,6 +25,11 @@ function migrate(): void {
             db()->exec('CREATE TABLE blog_addons (blog_id INTEGER NOT NULL REFERENCES blogs(id) ON DELETE CASCADE, addon_id TEXT NOT NULL, PRIMARY KEY(blog_id, addon_id))');
             foreach (query('SELECT id FROM blogs')->fetchAll() as $blog) enable_default_addons((int)$blog['id']);
         },
+        '004_admin' => static function () {
+            db()->exec('CREATE TABLE platform (id INTEGER PRIMARY KEY CHECK(id=1), admin_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL, admin_initialized INTEGER NOT NULL CHECK(admin_initialized IN (0,1)), homepage_blog_id INTEGER REFERENCES blogs(id) ON DELETE SET NULL)');
+            $first=one('SELECT id FROM users ORDER BY id LIMIT 1');
+            query('INSERT INTO platform(id,admin_user_id,admin_initialized) VALUES (1,?,?)',[$first['id']??null,$first?1:0]);
+        },
     ];
     foreach ($migrations as $version => $apply) transaction(static function () use ($version,$apply) {
         if (!one('SELECT version FROM migrations WHERE version=?',[$version])) {

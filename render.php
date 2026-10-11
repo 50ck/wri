@@ -24,7 +24,7 @@ function page(string $key,callable $content,?string $error=null,?array $manageme
     foreach ($styles as $id) echo '<link rel="stylesheet" href="/_addons/'.e($id).'/style.css">';
     echo '</head><body>';
     if ($management) {
-        echo '<header><h1 class="manage-title">'.e(t('manage')).'</h1><nav aria-label="'.e(t('manage')).'">'.link_to('/manage/settings','settings').' '.link_to('/manage/sections','sections').' '.link_to('/manage/appearance','appearance').' '.link_to('/manage/addons','addons').'</nav><div class="actions">'.link_to('/'.$management['username'],'blog').'<form class="inline" method="post" action="/logout">';token_field();button('logout');echo '</form></div></header>';
+        echo '<header><h1 class="manage-title">'.e(t('manage')).'</h1><nav aria-label="'.e(t('manage')).'">'.link_to('/manage/settings','settings').' '.link_to('/manage/sections','sections').' '.link_to('/manage/appearance','appearance').' '.link_to('/manage/addons','addons').(is_admin()?' '.link_to('/manage/admin','admin'):'').'</nav><div class="actions">'.link_to('/'.$management['username'],'blog').'<form class="inline" method="post" action="/logout">';token_field();button('logout');echo '</form></div></header>';
     }
     echo '<main id="main">'.($management?'<h2>':'<h1>').e(t($key)).($management?'</h2>':'</h1>');
     if ($error) echo '<p class="error" role="alert">'.e($error).'</p>';
@@ -157,5 +157,30 @@ function manage_addons(array $blog,?string $error=null): void {
         echo '<form method="post" action="/manage/addons">';token_field();
         foreach ($installed as $id=>$addon) echo '<p><label><input type="checkbox" name="addons[]" value="'.e($id).'"'.(isset($active[$id])?' checked':'').'> '.e($addon['label']['en']).'</label></p>';
         echo '<div class="actions">';button('save');echo '</div></form>';
+    },$error,$blog);
+}
+
+function manage_admin(array $blog,?string $error=null): void {
+    page('admin',function () {
+        $home=platform_settings()['homepage_blog_id'];
+        $selected=$home===null ? null : one('SELECT u.username FROM blogs b JOIN users u ON u.id=b.user_id WHERE b.id=?',[$home]);
+        echo '<h3>'.e(t('homepage')).'</h3><p>'.e($selected['username']??t('platform_home')).'</p><form method="post">';
+        token_field();echo '<input type="hidden" name="blog_id" value="">';button('use_platform_home');echo '</form><h3>'.e(t('users')).'</h3>';
+        $number=input('page',$_GET);
+        if ($number!=='' && (!ctype_digit($number) || (int)$number<1 || (int)$number>10000)) fail(400,'invalid');
+        $page=max(1,(int)$number);
+        $users=query('SELECT u.username,b.id,b.visibility FROM users u JOIN blogs b ON b.user_id=u.id ORDER BY u.id LIMIT 51 OFFSET ?',[($page-1)*50])->fetchAll();
+        $more=count($users)>50;echo '<ul class="section-list">';
+        foreach (array_slice($users,0,50) as $user) {
+            echo '<li><a href="/'.e($user['username']).'">'.e($user['username']).'</a>';
+            if ($user['visibility']==='public') {
+                echo ' <form class="inline" method="post">';token_field();echo '<input type="hidden" name="blog_id" value="'.$user['id'].'">';button('use_blog_home');echo '</form>';
+            } else echo ' <span class="section-actions">'.e(t('private')).'</span>';
+            echo '</li>';
+        }
+        echo '</ul><nav>';
+        if ($page>1) echo link_to('/manage/admin?page='.($page-1),'previous');
+        if ($more) echo link_to('/manage/admin?page='.($page+1),'next');
+        echo '</nav>';
     },$error,$blog);
 }
