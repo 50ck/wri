@@ -25,23 +25,19 @@ function migrate(): void {
             db()->exec('CREATE TABLE blog_addons (blog_id INTEGER NOT NULL REFERENCES blogs(id) ON DELETE CASCADE, addon_id TEXT NOT NULL, PRIMARY KEY(blog_id, addon_id))');
             foreach (query('SELECT id FROM blogs')->fetchAll() as $blog) enable_default_addons((int)$blog['id']);
         },
-        '004_admin' => static function () {
-            db()->exec('CREATE TABLE platform (id INTEGER PRIMARY KEY CHECK(id=1), admin_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL, admin_initialized INTEGER NOT NULL CHECK(admin_initialized IN (0,1)), homepage_blog_id INTEGER REFERENCES blogs(id) ON DELETE SET NULL)');
-            $first=one('SELECT id FROM users ORDER BY id LIMIT 1');
-            query('INSERT INTO platform(id,admin_user_id,admin_initialized) VALUES (1,?,?)',[$first['id']??null,$first?1:0]);
-        },
         '005_user_edit' => static function () {
             db()->exec('ALTER TABLE users ADD COLUMN auth_version INTEGER NOT NULL DEFAULT 0');
             db()->exec('CREATE TABLE username_aliases (username TEXT PRIMARY KEY COLLATE NOCASE, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE)');
-        },
-        '006_signups' => static function () {
-            db()->exec('ALTER TABLE platform ADD COLUMN allow_signups INTEGER NOT NULL DEFAULT 1 CHECK(allow_signups IN (0,1))');
         },
     ];
     foreach ($migrations as $version => $apply) transaction(static function () use ($version,$apply) {
         if (!one('SELECT version FROM migrations WHERE version=?',[$version])) {
             $apply(); query('INSERT INTO migrations VALUES (?,?)',[$version,now()]);
         }
+    });
+    if (!is_file(config()['settings_file'])) update_settings(static function (array &$settings) {
+        $first=one('SELECT id FROM users ORDER BY id LIMIT 1');
+        if (!$settings['admin_initialized'] && $first) { $settings['admin_user_id']=$first['id'];$settings['admin_initialized']=true; }
     });
 }
 
