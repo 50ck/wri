@@ -20,7 +20,11 @@ function route_manage(string $path): void {
         }
         if (preg_match('~\A/manage/sections/([1-9][0-9]*)/(edit|delete|reorder)\z~',$path,$m)) {
             $section=owned_section($blog,(int)$m[1]);
-            if ($m[2]==='edit') { methods(['GET','POST']);$error=submitted(function () use($blog,$section) {edit_section($blog,$section['id'],input('title'),input('content'));redirect('/manage/sections',303,'saved');});section_editor($blog,$section,$error);return; }
+            if ($m[2]==='edit') {
+                methods(['GET','POST']);$return=input('from',$_GET)==='section'?'/'.$blog['username'].'/'.$section['slug']:'/manage/sections';
+                $error=submitted(function () use($blog,$section,$return) {edit_section($blog,$section['id'],input('title'),input('content'));redirect($return,303,$return==='/manage/sections'?'saved':null);});
+                section_editor($blog,$section,$error,$return);return;
+            }
             if ($m[2]==='delete') { methods(['GET','POST']);submitted(function () use($blog,$section) {delete_section($blog,$section['id']);redirect('/manage/sections',303,'deleted');});confirmation('delete_section','delete_section_help','/manage/sections',$blog);return; }
             methods(['POST']);check_csrf();reorder_section($blog,$section['id'],input('direction'));redirect('/manage/sections',303,'saved');
         }
@@ -41,10 +45,10 @@ function route_manage(string $path): void {
     }
 }
 
-function section_editor(array $blog,?array $section,?string $error=null): void {
-    page($section?'edit_section':'new_section',function () use ($section) {
+function section_editor(array $blog,?array $section,?string $error=null,string $return='/manage/sections'): void {
+    page($section?'edit_section':'new_section',function () use ($section,$return) {
         echo '<form method="post">';token_field();field('title','title',value('title',$section['title']??''),'text',true,120);area('content','content',value('content',$section['content_markdown']??''));
-        echo '<div class="actions">';button('save');echo link_to('/manage/sections','cancel').'</div></form>';
+        echo '<div class="actions">';button('save');echo link_to($return,'cancel').'</div></form>';
     },$error,$blog);
 }
 

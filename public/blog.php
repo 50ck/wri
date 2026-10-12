@@ -79,7 +79,10 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
         echo $html.'</article>';
     } else {
         echo '<section class="blog-section"><h2>'.e($section['title']);
-        if ($owner) { echo ' ';icon_link('/'.$blog['username'].'/new?section_id='.$section['id'],'new_post','plus'); }
+        if ($owner) {
+            echo ' ';icon_link('/manage/sections/'.$section['id'].'/edit?from=section','edit','pencil');
+            echo ' ';icon_link('/'.$blog['username'].'/new?section_id='.$section['id'],'new_post','plus');
+        }
         echo '</h2>'.$html.'</section>';
         $number=input('page',$_GET); if ($number!=='' && (!ctype_digit($number) || (int)$number<1 || (int)$number>10000)) fail(400,'invalid');
         $page=max(1,(int)$number); $sql='SELECT * FROM posts WHERE blog_id=? AND section_id=? AND deleted_at IS NULL'; $params=[$blog['id'],$section['id']];
