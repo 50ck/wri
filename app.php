@@ -343,6 +343,9 @@ function is_owner(array $blog): bool { return (int)($blog['user_id']) === (int)(
 function can_read(array $blog): void { if ($blog['visibility'] === 'private' && !is_owner($blog)) fail(404, 'unavailable'); }
 function headers_for(?array $blog = null, bool $preview = false, array $addonStyles = []): void {
     send_header('Cache-Control: no-store, private'); send_header('X-Content-Type-Options: nosniff'); send_header('Referrer-Policy: no-referrer');
+    $path=explode('?',$_SERVER['REQUEST_URI']??'/',2)[0];
+    $operational=preg_match('~\A(?:/(?:manage|admin\.php|login|register|signup|logout)(?:/|$)|/[^/]+/(?:new|edit|delete|preview)(?:/|$))~',$path);
+    if ($operational || $preview || ($blog && $blog['visibility']==='private') || (http_response_code()?:200)>=400) send_header('X-Robots-Tag: noindex');
     $origin=config()['base_url'];
     $styles = $origin . '/assets/base.css';
     foreach ($addonStyles as $id) if (isset(addons('admin')[$id]['style'])) $styles.=' '.$origin.'/_addons/'.$id.'/style.css';
