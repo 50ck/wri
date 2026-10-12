@@ -8,8 +8,8 @@
 __pycache__/
 *.pyc
 
-/extensions/mermaid/bin/mmdr
-/extensions/mermaid/bin/mmdr.new
+/addons/mermaid/bin/mmdr
+/addons/mermaid/bin/mmdr.new
 
 /config.ini
 /config.ini.lock

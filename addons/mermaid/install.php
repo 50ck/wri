@@ -18,7 +18,7 @@ try {
     chmod($dir.'/mmdr',0755);
     // Copy then rename in the destination filesystem for an atomic installation.
     if (!copy($dir.'/mmdr',$root.'/bin/mmdr.new') || !chmod($root.'/bin/mmdr.new',0755) || !rename($root.'/bin/mmdr.new',$root.'/bin/mmdr')) throw new RuntimeException('Installation failed');
-    echo "mmdr 0.3.1 installed in extensions/mermaid/bin/mmdr.\n";
+    echo "mmdr 0.3.1 installed in addons/mermaid/bin/mmdr.\n";
 } catch (Throwable $error) { fwrite(STDERR,$error->getMessage()."\n");$exitCode=1; }
 finally { if (is_file($root.'/bin/mmdr.new')) unlink($root.'/bin/mmdr.new'); foreach (glob($dir.'/*') as $file) unlink($file);rmdir($dir); }
 exit($exitCode);

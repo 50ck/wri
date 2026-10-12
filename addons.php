@@ -4,7 +4,7 @@ declare(strict_types=1);
 function addons(?string $type=null): array {
     static $registry;
     if ($registry===null) {
-        $registry=[];$root=__DIR__.'/extensions';
+        $registry=[];$root=__DIR__.'/addons';
         foreach (glob($root.'/*/addon.php') ?: [] as $file) {
             $id=basename(dirname($file));$real=realpath($file);
             if (!preg_match('/\A[a-z][a-z0-9-]{0,31}\z/',$id) || !$real || !str_starts_with($real,$root.'/')) continue;
