@@ -72,7 +72,6 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
     addon_slot('nav',$blog);
     echo '</nav></header>';
     echo '<main class="blog-main" id="main">';
-    if ($owner && isset($_SESSION['flash'])) { echo '<p class="feedback" role="status">'.e(t($_SESSION['flash'])).'</p>'; unset($_SESSION['flash']); }
     if ($post) {
         echo '<article class="blog-post"><h2 class="blog-post-title">'.e($post['title']).'</h2><p><time class="blog-post-date" datetime="'.e($post['published_at'] ?? $post['created_at']).'">'.e(substr($post['published_at'] ?? $post['created_at'],0,10)).'</time>'.($post['status']==='draft'?e(t('draft')):'').'</p><div class="blog-post-body">'.$html.'</div></article>';
         addon_slot('post_after',$blog,$post);
@@ -104,6 +103,7 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
         $base='/'.$blog['username'].($section?'/'.$section['slug']:'/blogs');
         echo '<nav aria-label="'.e(t('next')).'">';if ($page>1) echo link_to($base.'?page='.($page-1),'previous');if ($more) echo ' '.link_to($base.'?page='.($page+1),'next');echo '</nav>';
     }
+    if ($owner && isset($_SESSION['flash'])) { echo '<p class="feedback" role="status">'.e(t($_SESSION['flash'])).'</p>'; unset($_SESSION['flash']); }
     echo '</main>';
     if ($owner) { echo '<div class="blog-settings">';icon_link('/manage','settings','settings');echo '</div>'; }
     echo '</body></html>';

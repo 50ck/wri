@@ -45,8 +45,9 @@ function page(string $key,callable $content,?string $error=null,?array $manageme
     }
     echo '<main id="main">'.($management?'<h2>':'<h1>').e(t($key)).($management?'</h2>':'</h1>');
     if ($error) echo '<p class="error" role="alert">'.e($error).'</p>';
+    $content();
     if (isset($_SESSION['flash'])) { echo '<p class="feedback" role="status">'.e(t($_SESSION['flash'])).'</p>'; unset($_SESSION['flash']); }
-    $content(); echo '</main></body></html>';
+    echo '</main></body></html>';
 }
 
 function value(string $key,string $default=''): string { return ($_SERVER['REQUEST_METHOD']==='POST') ? input($key) : $default; }
