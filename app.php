@@ -31,7 +31,9 @@ function page(string $key,callable $content,?string $error=null,?array $manageme
     if ($key==='brand') foreach (addons('admin') as $id=>$extension) if (isset($extension['slots']['home_after'])) $styles[]=$id;
     $styles=array_filter(array_unique($styles),static fn($id)=>isset(addons('admin')[$id]['style']));
     headers_for(addonStyles:$styles);
-    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e(t($key)).' · '.e(t('brand')).'</title><link rel="stylesheet" href="/assets/base.css">';
+    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e($key==='brand'?t('brand'):t($key).' · '.t('brand')).'</title>';
+    if ($key==='brand' && t('intro')!=='') echo '<meta name="description" content="'.e(t('intro')).'">';
+    echo '<link rel="stylesheet" href="/assets/base.css">';
     foreach ($styles as $id) echo '<link rel="stylesheet" href="/_addons/'.e($id).'/style.css">';
     echo '</head><body>';
     if ($management) {

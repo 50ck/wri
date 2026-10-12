@@ -59,11 +59,31 @@ function route_blog(string $path): void {
     fail(404,'not_found');
 }
 
+function blog_excerpt(string $html): string {
+    $doc=new DOMDocument();$previous=libxml_use_internal_errors(true);
+    $doc->loadHTML('<?xml encoding="UTF-8">'.$html,LIBXML_NONET);
+    libxml_clear_errors();libxml_use_internal_errors($previous);
+    foreach (['pre','code','math','svg'] as $tag) foreach (iterator_to_array($doc->getElementsByTagName($tag)) as $node) $node->parentNode?->removeChild($node);
+    foreach ($doc->getElementsByTagName('p') as $paragraph) {
+        if ($paragraph->getAttribute('class')==='markdown-alert-title') continue;
+        $text=trim(preg_replace('/\s+/u',' ',$paragraph->textContent));
+        if ($text!=='') return mb_strlen($text,'UTF-8')>200?mb_substr($text,0,197,'UTF-8').'…':$text;
+    }
+    return '';
+}
 function render_blog(array $blog,?array $section=null,?array $post=null,bool $preview=false): void {
+    $number=$section && !$post?input('page',$_GET):'';
+    if ($number!=='' && (!ctype_digit($number) || (int)$number<1 || (int)$number>10000)) fail(400,'invalid');
+    $page=max(1,(int)$number);
     $body=$post ? $post['body_markdown'] : ($section ? $section['content_markdown'] : $blog['home_markdown']);
     $html=markdown($body,$blog);
+    $title=$post || $section?($post['title']??$section['title']).' · '.$blog['title']:$blog['title'];
+    if ($page>1) $title.=' · '.str_replace('{n}',(string)$page,t('page_number'));
+    $description=$post || $section?blog_excerpt($html):$blog['description'];
     headers_for($blog,$preview); $owner=is_owner($blog) && !$preview;
-    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e(($post['title'] ?? $section['title'] ?? $blog['title'])).'</title><link rel="stylesheet" href="/'.e($blog['username']).'/style.css"></head><body class="blog"><header class="blog-header"><h1 class="blog-title"><a href="/'.e($blog['username']).'">'.e($blog['title']).'</a></h1>';
+    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e($title).'</title>';
+    if ($description!=='') echo '<meta name="description" content="'.e($description).'">';
+    echo '<link rel="stylesheet" href="/'.e($blog['username']).'/style.css"></head><body class="blog"><header class="blog-header"><h1 class="blog-title"><a href="/'.e($blog['username']).'">'.e($blog['title']).'</a></h1>';
     if ($blog['description']!=='') echo '<p class="blog-description">'.e($blog['description']).'</p>';
     echo '<nav class="blog-nav" aria-label="'.e(t('sections')).'">';
     foreach (navigation_sections($blog['id']) as $item) echo '<a href="/'.e($blog['username']).($item['slug']!==''?'/'.e($item['slug']):'').'">'.e($item['title']).'</a> ';
@@ -84,8 +104,7 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
             echo ' ';icon_link('/'.$blog['username'].'/new?section_id='.$section['id'],'new_post','plus');
         }
         echo '</h2>'.$html.'</section>';
-        $number=input('page',$_GET); if ($number!=='' && (!ctype_digit($number) || (int)$number<1 || (int)$number>10000)) fail(400,'invalid');
-        $page=max(1,(int)$number); $sql='SELECT * FROM posts WHERE blog_id=? AND section_id=? AND deleted_at IS NULL'; $params=[$blog['id'],$section['id']];
+        $sql='SELECT * FROM posts WHERE blog_id=? AND section_id=? AND deleted_at IS NULL'; $params=[$blog['id'],$section['id']];
         $sql.=' ORDER BY published_at DESC,id DESC LIMIT 21 OFFSET ?';$params[]=($page-1)*20;
         $posts=query($sql,$params)->fetchAll();$more=count($posts)>20;$posts=array_slice($posts,0,20);
         if (!$posts) echo '<p>'.e(t('empty')).'</p>';
