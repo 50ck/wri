@@ -9,8 +9,8 @@ function markdown_own_link(string $href,?array $blog): bool {
         foreach (['scheme','host'] as $key) if (strtolower($url[$key]??'')!==strtolower($origin[$key])) return false;
         if (isset($url['user']) || ($url['port']??(strtolower($url['scheme'])==='https'?443:80))!==($origin['port']??($origin['scheme']==='https'?443:80))) return false;
     }
-    $path=$url['path']??'';$home='/'.$blog['username'];
-    return !preg_match('~(?:^|/)(?:\.|\.\.)(?:/|$)~',$path) && ($path===$home || str_starts_with($path,$home.'/'));
+    $path=$url['path']??(isset($url['host'])?'/':'');$home='/'.$blog['username'];
+    return !preg_match('~(?:^|/)(?:\.|\.\.)(?:/|$)~',$path) && ($path===$home || str_starts_with($path,$home.'/') || ($path==='/' && config()['homepage']===$blog['username']));
 }
 function markdown_image_url(string $url): ?string {
     if (strlen($url)>512 || preg_match('/[\x00-\x20\x7f\\\\;<>"\']/', $url) || !filter_var($url,FILTER_VALIDATE_URL)) return null;
