@@ -38,6 +38,19 @@ function route_admin(string $path): void {
         $error=submitted(function () {register_account(input('username'),input('new_password'),input('confirm_password'),true);redirect('/admin.php/users',303,'saved');});
         auth_form('register',$error,$blog);return;
     }
+    if (preg_match('~\A/admin\.php/users/([1-9][0-9]*)/admin\z~',$path,$m)) {
+        methods(['GET','POST']);$user=admin_user((int)$m[1]);
+        $enabled=input('enabled',$_SERVER['REQUEST_METHOD']==='POST'?$_POST:$_GET);
+        if (!in_array($enabled,['0','1'],true)) fail(400,'invalid');
+        if ($enabled==='0' && $user['id']===$blog['user_id']) fail(403,'forbidden');
+        $error=submitted(function () use($user,$enabled) {
+            set_user_admin($user['id'],$enabled==='1');redirect('/admin.php/users',303,'saved');
+        });
+        page('sure',function () use($enabled) {
+            echo '<form method="post">';token_field();
+            echo '<input type="hidden" name="enabled" value="'.$enabled.'"><div class="actions">'.link_to('/admin.php/users','cancel');button('confirm');echo '</div></form>';
+        },$error,$blog);return;
+    }
     if (preg_match('~\A/admin\.php/users/([1-9][0-9]*)/(edit|delete)\z~',$path,$m)) {
         methods(['GET','POST']);$user=admin_user((int)$m[1]);$self=$user['id']===$blog['user_id'];
         if ($m[2]==='delete' && $self) fail(403,'forbidden');
@@ -70,7 +83,7 @@ function route_admin(string $path): void {
 }
 
 function admin_users(array $blog,?string $error=null): void {
-    page('users',function () {
+    page('users',function () use($blog) {
         $platform=config();$home=$platform['homepage_blog_id'];
         if ($home!==null) echo '<ul class="section-list"><li>'.link_to('/admin.php/users/homepage','use_platform_home').'</li></ul>';
         $number=input('page',$_GET);
@@ -83,6 +96,7 @@ function admin_users(array $blog,?string $error=null): void {
             echo ' <span class="section-actions">';
             icon_link('/admin.php/users/'.$user['user_id'].'/edit','edit','pencil');
             if (!is_admin($user)) { echo ' ';icon_link('/admin.php/users/'.$user['user_id'].'/delete','delete','trash'); }
+            if ($user['user_id']!==$blog['user_id']) echo ' '.link_to('/admin.php/users/'.$user['user_id'].'/admin?enabled='.(is_admin($user)?'0':'1'),is_admin($user)?'remove_admin':'grant_admin');
             if ($user['visibility']==='public' && (int)$user['id']!==(int)$home) {
                 echo ' '.link_to('/admin.php/users/homepage?blog_id='.$user['id'],'use_blog_home');
             } elseif ($user['visibility']==='private') echo ' '.e(t('private'));

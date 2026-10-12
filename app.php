@@ -278,6 +278,18 @@ function admin_user(int $id): array {
     require_admin();
     return one('SELECT u.*,b.id AS blog_id,b.visibility FROM users u JOIN blogs b ON b.user_id=u.id WHERE u.id=?',[$id]) ?? throw new HttpError(404,t('not_found'));
 }
+function set_user_admin(int $id,bool $enabled): void {
+    require_admin();
+    transaction(static function () use($id,$enabled) {
+        update_settings(static function (array &$settings) use($id,$enabled) {
+            $user=admin_user($id);
+            if (!$enabled && $id===(int)require_user()['id']) fail(403,'forbidden');
+            $settings['username']=$enabled
+                ? array_values(array_unique([...$settings['username'],$user['username']]))
+                : array_values(array_filter($settings['username'],static fn($name)=>$name!==$user['username']));
+        });
+    });
+}
 function admin_edit_user(int $id,string $name,string $password,string $confirm,string $visibility): void {
     require_admin();$name=username($name);
     if (!in_array($visibility,['public','private'],true)) fail(422,'invalid');
