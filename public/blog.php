@@ -16,8 +16,8 @@ function route_blog(string $path): void {
             methods(['GET','POST']);$error=submitted(function () use($blog) {
                 rate_limit('post-new',(string)$blog['user_id'],30,3600);
                 $section=input('section_id');if ($section!=='' && (!ctype_digit($section) || (int)$section<1)) fail(422,'invalid');
-                $id=save_post($blog,null,input('title'),input('body'),$section!==''?(int)$section:null,input('status'));
-                redirect(post_path($blog,owned_post($blog,$id)),303,input('status')==='published'?'published':'saved');
+                $id=save_post($blog,null,input('title'),input('body'),$section!==''?(int)$section:null);
+                redirect(post_path($blog,owned_post($blog,$id)),303,'published');
             });post_editor($blog,null,$error);return;
         }
         if (count($tail)===2 && ctype_digit($tail[1])) {
@@ -25,8 +25,8 @@ function route_blog(string $path): void {
             if ($tail[0]==='edit') {
                 methods(['GET','POST']);$error=submitted(function () use($blog,$post) {
                     $section=input('section_id');if ($section!=='' && (!ctype_digit($section) || (int)$section<1)) fail(422,'invalid');
-                    save_post($blog,$post['id'],input('title'),input('body'),$section!==''?(int)$section:null,input('status'));
-                    redirect(post_path($blog,owned_post($blog,$post['id'])),303,input('status')==='published'?'published':'saved');
+                    save_post($blog,$post['id'],input('title'),input('body'),$section!==''?(int)$section:null);
+                    redirect(post_path($blog,owned_post($blog,$post['id'])),303,'saved');
                 });post_editor($blog,$post,$error);return;
             }
             methods(['GET','POST']);submitted(function () use($blog,$post) {delete_post($blog,$post['id']);redirect('/'.$blog['username'].'/blogs',303,'deleted');});confirmation('delete_post','delete_post_help',post_path($blog,$post));return;
@@ -52,10 +52,9 @@ function route_blog(string $path): void {
         $post=($section || $tail[0]==='posts') ? one('SELECT * FROM posts WHERE blog_id=? AND section_id IS ? AND slug=? AND deleted_at IS NULL',[$blog['id'],$section['id']??null,$tail[1]]) : null;
         if (!$post) {
             $old=one('SELECT p.* FROM redirects r JOIN posts p ON p.id=r.post_id WHERE r.blog_id=? AND r.old_path=? AND p.deleted_at IS NULL',[$blog['id'],implode('/',$tail)]);
-            if ($old && ($old['status']==='published'||is_owner($blog))) redirect(post_path($blog,$old),302);
+            if ($old) redirect(post_path($blog,$old),302);
             fail(404,'not_found');
         }
-        if ($post['status']!=='published' && !is_owner($blog)) fail(404,'not_found');
         render_blog($blog,$section,$post);return;
     }
     fail(404,'not_found');
@@ -73,7 +72,7 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
     echo '</nav></header>';
     echo '<main class="blog-main" id="main">';
     if ($post) {
-        echo '<article class="blog-post"><h2 class="blog-post-title">'.e($post['title']).'</h2><p><time class="blog-post-date" datetime="'.e($post['published_at'] ?? $post['created_at']).'">'.e(substr($post['published_at'] ?? $post['created_at'],0,10)).'</time>'.($post['status']==='draft'?e(t('draft')):'').'</p><div class="blog-post-body">'.$html.'</div></article>';
+        echo '<article class="blog-post"><h2 class="blog-post-title">'.e($post['title']).'</h2><p><time class="blog-post-date" datetime="'.e($post['published_at']).'">'.e(substr($post['published_at'],0,10)).'</time></p><div class="blog-post-body">'.$html.'</div></article>';
         addon_slot('post_after',$blog,$post);
         if ($owner) { echo '<div class="blog-owner">';icon_link('/'.$blog['username'].'/edit/'.$post['id'],'edit','pencil');icon_link('/'.$blog['username'].'/delete/'.$post['id'],'delete','trash');echo '</div>'; }
     } elseif (!$section && !$feed) {
@@ -89,14 +88,13 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
         $number=input('page',$_GET); if ($number!=='' && (!ctype_digit($number) || (int)$number<1 || (int)$number>10000)) fail(400,'invalid');
         $page=max(1,(int)$number); $sql='SELECT * FROM posts WHERE blog_id=? AND deleted_at IS NULL'; $params=[$blog['id']];
         if ($section) { $sql.=' AND section_id=?';$params[]=$section['id']; }
-        if (!$owner) $sql.=" AND status='published'";
-        $sql.=' ORDER BY COALESCE(published_at,created_at) DESC,id DESC LIMIT 21 OFFSET ?';$params[]=($page-1)*20;
+        $sql.=' ORDER BY published_at DESC,id DESC LIMIT 21 OFFSET ?';$params[]=($page-1)*20;
         $posts=query($sql,$params)->fetchAll();$more=count($posts)>20;$posts=array_slice($posts,0,20);
         if (!$posts) echo '<p>'.e(t('empty')).'</p>';
         else {
             echo '<ul class="blog-post-list">';
             foreach ($posts as $item) {
-                echo '<li><time class="blog-post-date" datetime="'.e($item['published_at']??$item['created_at']).'">'.e(substr($item['published_at']??$item['created_at'],0,10)).'</time><a href="'.e(post_path($blog,$item)).'">'.e($item['title']).'</a>'.($item['status']==='draft'?' · '.e(t('draft')):'');
+                echo '<li><time class="blog-post-date" datetime="'.e($item['published_at']).'">'.e(substr($item['published_at'],0,10)).'</time><a href="'.e(post_path($blog,$item)).'">'.e($item['title']).'</a>';
                 if ($owner) { echo ' ';icon_link('/'.$blog['username'].'/edit/'.$item['id'],'edit','pencil');echo ' ';icon_link('/'.$blog['username'].'/delete/'.$item['id'],'delete','trash'); } echo '</li>';
             } echo '</ul>';
         }
@@ -116,6 +114,6 @@ function post_editor(array $blog,?array $post,?string $error=null): void {
         $selected=value('section_id',(string)($post['section_id']??''));
         foreach (section_list($blog['id']) as $section) echo '<option value="'.$section['id'].'"'.($selected===(string)$section['id']?' selected':'').'>'.e($section['title']).'</option>';
         echo '</select>';area('body','content',value('body',$post['body_markdown']??''));
-        echo '<div class="actions">';button('save_draft','status','draft');button('publish','status','published');echo link_to('/'.$blog['username'],'cancel').'</div></form>';
+        echo '<div class="actions">';button($post?'save':'publish');echo link_to('/'.$blog['username'],'cancel').'</div></form>';
     },$error);
 }

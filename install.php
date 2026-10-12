@@ -55,15 +55,14 @@ CREATE TABLE IF NOT EXISTS posts (
  title TEXT NOT NULL,
  slug TEXT NOT NULL,
  body_markdown TEXT NOT NULL,
- status TEXT NOT NULL CHECK(status IN ('draft','published')),
  created_at TEXT NOT NULL,
  updated_at TEXT NOT NULL,
- published_at TEXT,
+ published_at TEXT NOT NULL,
  deleted_at TEXT,
  FOREIGN KEY(blog_id, section_id) REFERENCES sections(blog_id, id)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS posts_slug ON posts(blog_id, COALESCE(section_id, 0), slug);
-CREATE INDEX IF NOT EXISTS posts_feed ON posts(blog_id, status, deleted_at, published_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS posts_feed ON posts(blog_id, deleted_at, published_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS posts_section ON posts(blog_id, section_id);
 CREATE TABLE IF NOT EXISTS redirects (
  blog_id INTEGER NOT NULL REFERENCES blogs(id) ON DELETE CASCADE,

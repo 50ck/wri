@@ -452,10 +452,9 @@ function delete_section(array $blog,int $id): void {
     });
 }
 function owned_post(array $blog,int $id): array { return one('SELECT * FROM posts WHERE id=? AND blog_id=? AND deleted_at IS NULL',[$id,$blog['id']]) ?? throw new HttpError(404,t('not_found')); }
-function save_post(array $blog,?int $id,string $title,string $body,?int $section,string $status): int {
+function save_post(array $blog,?int $id,string $title,string $body,?int $section): int {
     $title=text_field($title,200); $body=markdown_field($body);
-    if (!in_array($status,['draft','published'],true)) fail(422,'invalid');
-    return transaction(function () use ($blog,$id,$title,$body,$section,$status) {
+    return transaction(function () use ($blog,$id,$title,$body,$section) {
         if ($section) owned_section($blog,$section);
         $time=now();
         if ($id) {
@@ -464,12 +463,12 @@ function save_post(array $blog,?int $id,string $title,string $body,?int $section
                 $slug=free_post_slug($blog['id'],$section,$slug,$id);
                 remember_path($blog['id'],namespace_path($post['section_id'],$post['slug']),$id);
             }
-            query('UPDATE posts SET title=?,body_markdown=?,section_id=?,slug=?,status=?,updated_at=?,published_at=? WHERE id=? AND blog_id=?',[$title,$body,$section,$slug,$status,$time,$post['published_at'] ?? ($status==='published'?$time:null),$id,$blog['id']]);
+            query('UPDATE posts SET title=?,body_markdown=?,section_id=?,slug=?,updated_at=? WHERE id=? AND blog_id=?',[$title,$body,$section,$slug,$time,$id,$blog['id']]);
             return $id;
         }
         if ((int)query('SELECT count(*) FROM posts WHERE blog_id=?',[$blog['id']])->fetchColumn() >= config()['post_limit']) fail(422,'post_limit');
         $slug=free_post_slug($blog['id'],$section,slug_base($title));
-        query('INSERT INTO posts(blog_id,section_id,title,slug,body_markdown,status,created_at,updated_at,published_at) VALUES (?,?,?,?,?,?,?,?,?)',[$blog['id'],$section,$title,$slug,$body,$status,$time,$time,$status==='published'?$time:null]);
+        query('INSERT INTO posts(blog_id,section_id,title,slug,body_markdown,created_at,updated_at,published_at) VALUES (?,?,?,?,?,?,?,?)',[$blog['id'],$section,$title,$slug,$body,$time,$time,$time]);
         return (int)db()->lastInsertId();
     });
 }
