@@ -8,6 +8,7 @@ function route_index(string $path): void {
         if ($home!==null) {
             $blog=one('SELECT b.*,u.username FROM blogs b JOIN users u ON u.id=b.user_id WHERE b.id=?',[$home]);
             if (!$blog) fail(404,'unavailable');
+            require_once __DIR__.'/blog.php';
             can_read($blog);render_blog($blog);return;
         }
         page('brand',function () {
@@ -41,4 +42,16 @@ function route_index(string $path): void {
     if ($path==='/logout') { methods(['POST']);check_csrf();logout();redirect('/'); }
     fail(404,'not_found');
 }
+function auth_form(string $kind,?string $error=null,?array $management=null): void {
+    $action=$management?'/manage/admin/users/new':'/'.$kind;
+    page($management?'create_user':$kind,function () use ($kind,$action) {
+        echo '<form method="post" action="'.e($action).'">'; token_field();
+        field('username','username',value('username',input('username',$_GET)),'text',true,24);
+        if ($kind==='register') echo '<small>'.e(t('username_help')).'</small>';
+        field($kind==='register'?'new_password':'password','password','','password');
+        if ($kind==='register') { field('confirm_password','confirm_password','','password'); echo '<small>'.e(t('password_help')).'</small>'; }
+        echo '<div class="actions">';button($action==='/manage/admin/users/new'?'create_user':$kind);echo '</div></form>';
+    },$error,$management);
+}
+
 run();

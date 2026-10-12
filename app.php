@@ -3,7 +3,55 @@ declare(strict_types=1);
 umask(0077);
 require_once __DIR__.'/addons.php';
 require_once __DIR__.'/markdown.php';
-require_once __DIR__.'/render.php';
+function e(mixed $value): string { return htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
+
+function link_to(string $path,string $key): string { return '<a href="'.e($path).'">'.e(t($key)).'</a>'; }
+
+function token_field(): void { echo '<input type="hidden" name="csrf" value="'.e(csrf()).'">'; }
+
+function field(string $name,string $key,string $value='',string $type='text',bool $required=true,int $max=0): void {
+    echo '<label for="'.e($name).'">'.e(t($key)).'</label><input id="'.e($name).'" name="'.e($name).'" type="'.e($type).'" value="'.e($value).'"'.($required?' required':'').($max?' maxlength="'.$max.'"':'');
+    if ($type==='password') echo ' autocomplete="'.(in_array($name,['confirm_password','new_password'],true)?'new-password':'current-password').'"';
+    if ($name==='username') echo ' autocomplete="username" autocapitalize="none" spellcheck="false"';
+    echo '>';
+}
+
+function area(string $name,string $key,string $value='',bool $css=false): void {
+    if ($css) echo '<label for="'.e($name).'">'.e(t($key)).'</label>';
+    echo '<textarea id="'.e($name).'" name="'.e($name).'"'.($css?' class="css-editor" spellcheck="false"':' aria-label="'.e(t($key)).'" aria-describedby="'.e($name).'-help"').'>'.e($value).'</textarea>';
+    if (!$css) echo '<small id="'.e($name).'-help">'.e(t('markdown_help')).'</small>';
+}
+
+function button(string $key,?string $name=null,?string $value=null): void { echo '<button type="submit"'.($name?' name="'.e($name).'" value="'.e($value).'"':'').'>'.e(t($key)).'</button>'; }
+
+function page(string $key,callable $content,?string $error=null,?array $management=null,?string $addon=null): void {
+    $styles=$addon===null ? [] : [$addon];
+    if ($key==='brand') foreach (addons('admin') as $id=>$extension) if (isset($extension['slots']['home_after'])) $styles[]=$id;
+    $styles=array_filter(array_unique($styles),static fn($id)=>isset(addons('admin')[$id]['style']));
+    headers_for(addonStyles:$styles);
+    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e(t($key)).' · '.e(t('brand')).'</title><link rel="stylesheet" href="/assets/base.css">';
+    foreach ($styles as $id) echo '<link rel="stylesheet" href="/_addons/'.e($id).'/style.css">';
+    echo '</head><body>';
+    if ($management) {
+        echo '<header><h1 class="manage-title">'.e(t('manage')).'</h1><nav aria-label="'.e(t('manage')).'">'.link_to('/manage/settings','settings').' '.link_to('/manage/sections','sections').' '.link_to('/manage/appearance','appearance').' '.link_to('/manage/addons','addons').(is_admin()?' '.link_to('/manage/admin','admin'):'').'</nav><div class="actions">'.link_to('/'.$management['username'],'blog').'<form class="inline" method="post" action="/logout">';token_field();button('logout');echo '</form></div></header>';
+    }
+    echo '<main id="main">'.($management?'<h2>':'<h1>').e(t($key)).($management?'</h2>':'</h1>');
+    if ($error) echo '<p class="error" role="alert">'.e($error).'</p>';
+    if (isset($_SESSION['flash'])) { echo '<p class="feedback" role="status">'.e(t($_SESSION['flash'])).'</p>'; unset($_SESSION['flash']); }
+    $content(); echo '</main></body></html>';
+}
+
+function value(string $key,string $default=''): string { return ($_SERVER['REQUEST_METHOD']==='POST') ? input($key) : $default; }
+
+function icon_link(string $path,string $key,string $shape): void {
+    $shapes=['plus'=>'M8 2v12M2 8h12','pencil'=>'M3 10l7-7 3 3-7 7-4 1zM9 4l3 3','trash'=>'M3 4h10M6 4V2h4v2M4 4l1 10h6l1-10','settings'=>'M8 1v2M8 13v2M1 8h2M13 8h2M3 3l2 2M11 11l2 2M3 13l2-2M11 5l2-2'];
+    echo '<a href="'.e($path).'" aria-label="'.e(t($key)).'" title="'.e(t($key)).'"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="'.e($shapes[$shape]).'"/>'.($shape==='settings'?'<circle cx="8" cy="8" r="3"/>':'').'</svg></a>';
+}
+
+function confirmation(string $key,string $help,string $cancel,?array $management=null): void {
+    page($key,function () use ($help,$cancel) {echo '<p>'.e(t($help)).'</p><form method="post">';token_field();echo '<div class="actions">'.link_to($cancel,'cancel');button('confirm');echo '</div></form>';},null,$management);
+}
+
 function config_fields(): array {
     return [
         'site'=>['name'=>'site_name','description'=>'site_description','base_url'=>'base_url','registration'=>'registration','debug'=>'debug'],
