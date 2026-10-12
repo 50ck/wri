@@ -39,7 +39,7 @@ function migrate(): void {
             $apply(); query('INSERT INTO migrations VALUES (?,?)',[$version,now()]);
         }
     });
-    if (!is_file(config()['settings_file'])) update_settings(static function (array &$settings) {
+    update_settings(static function (array &$settings) {
         $first=one('SELECT id FROM users ORDER BY id LIMIT 1');
         if (!$settings['admin_initialized'] && ($settings['admin_user_id']!==null || $first)) { $settings['admin_user_id']??=$first['id'];$settings['admin_initialized']=true; }
     });
@@ -113,7 +113,7 @@ SQL;
 if (realpath($_SERVER['SCRIPT_FILENAME']??'')!==__FILE__) return;
 try {
     if (PHP_VERSION_ID < 80400 || !extension_loaded('pdo_sqlite') || !extension_loaded('mbstring') || !extension_loaded('dom')) throw new RuntimeException('PHP 8.4+, pdo_sqlite, mbstring and dom are required.');
-    foreach ([dirname(config()['database']), config()['session_path']] as $dir) if (!is_dir($dir) && !mkdir($dir, 0700, true)) throw new RuntimeException('Cannot create storage.');
+    foreach ([dirname(config()['database']), config()['session_path'], dirname(config()['config_file'])] as $dir) if (!is_dir($dir) && !mkdir($dir, 0700, true)) throw new RuntimeException('Cannot create storage.');
     if (dirname(config()['database']) === __DIR__.'/storage') chmod(dirname(config()['database']), 0700);
     chmod(config()['session_path'], 0700);
     migrate(); chmod(config()['database'], 0600);

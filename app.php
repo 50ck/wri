@@ -1,10 +1,128 @@
 <?php
 declare(strict_types=1);
 umask(0077);
-require_once __DIR__.'/config.php';
 require_once __DIR__.'/addons.php';
 require_once __DIR__.'/markdown.php';
 require_once __DIR__.'/render.php';
+function config_fields(): array {
+    return [
+        'site'=>['name'=>'site_name','description'=>'site_description','base_url'=>'base_url','registration'=>'registration','debug'=>'debug'],
+        'admin'=>['user_id'=>'admin_user_id','initialized'=>'admin_initialized','allow_signups'=>'allow_signups','homepage_blog_id'=>'homepage_blog_id'],
+        'storage'=>['database'=>'database','sessions'=>'session_path'],
+        'limits'=>['request_bytes'=>'request_limit','markdown_bytes'=>'body_limit','css_bytes'=>'css_limit','posts_per_blog'=>'post_limit'],
+        'sessions'=>['lifetime_seconds'=>'session_lifetime'],
+        'passwords'=>['argon_memory_kib'=>'argon_memory','argon_time'=>'argon_time','bcrypt_cost'=>'bcrypt_cost'],
+    ];
+}
+function config(bool $reload=false): array {
+    static $config;
+    if ($reload) $config=null;
+    if ($config!==null) return $config;
+    $file=getenv('BLOG_CONFIG') ?: __DIR__.'/config.ini';
+    if (!str_starts_with($file,'/')) $file=__DIR__.'/'.$file;
+    if (file_exists($file) && !is_file($file)) throw new RuntimeException('Invalid configuration file');
+    $defaults=parse_ini_file(__DIR__.'/config.example.ini',true,INI_SCANNER_RAW);
+    $settings=is_file($file) ? parse_ini_file($file,true,INI_SCANNER_RAW) : [];
+    if ($defaults===false || $settings===false) throw new RuntimeException('Invalid configuration file');
+    $values=array_replace_recursive($defaults,$settings);
+    $result=$values;
+    foreach (config_fields() as $section=>$fields) foreach ($fields as $name=>$key) {
+        $value=$values[$section][$name]??null;
+        if (!is_string($value)) throw new RuntimeException('Invalid configuration value');
+        $override=getenv('BLOG_'.strtoupper($key));
+        if ($override!==false) $value=$override;
+        $result[$key]=$value;
+    }
+    foreach (['registration','debug','admin_initialized','allow_signups'] as $key) {
+        $result[$key]=filter_var($result[$key],FILTER_VALIDATE_BOOLEAN,FILTER_NULL_ON_FAILURE);
+        if ($result[$key]===null) throw new RuntimeException('Invalid configured flag');
+    }
+    foreach (['admin_user_id','homepage_blog_id'] as $key) {
+        $value=$result[$key];
+        $result[$key]=$value===''?null:filter_var($value,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
+        if ($result[$key]===false) throw new RuntimeException('Invalid configured ID');
+    }
+    foreach (['request_limit'=>[1,16777216],'body_limit'=>[1,16777216],'css_limit'=>[1,16777216],'post_limit'=>[1,1000000],'session_lifetime'=>[60,31536000],'argon_memory'=>[8192,1048576],'argon_time'=>[1,10],'bcrypt_cost'=>[4,16]] as $key=>[$min,$max]) {
+        $result[$key]=filter_var($result[$key],FILTER_VALIDATE_INT,['options'=>['min_range'=>$min,'max_range'=>$max]]);
+        if ($result[$key]===false) throw new RuntimeException('Invalid configured limit');
+    }
+    foreach (['database','session_path'] as $key) {
+        if ($result[$key]==='' || str_contains($result[$key],"\0")) throw new RuntimeException('Invalid storage path');
+        if (!str_starts_with($result[$key],'/')) $result[$key]=dirname($file).'/'.$result[$key];
+    }
+    $result['base_url']=rtrim($result['base_url'],'/');
+    $url=parse_url($result['base_url']);
+    if (!$url || !in_array($url['scheme']??'',['http','https'],true) || empty($url['host']) || isset($url['user']) || isset($url['query']) || isset($url['fragment']) || !empty($url['path'])) throw new RuntimeException('Invalid base URL');
+    $result['config_file']=$file;
+    return $config=$result;
+}
+function update_settings(callable $action): mixed {
+    $file=config()['config_file'];$lock=fopen($file.'.lock','c');$temp=null;
+    if (!$lock) throw new RuntimeException('Cannot lock configuration');
+    try {
+        if (!flock($lock,LOCK_EX)) throw new RuntimeException('Cannot lock configuration');
+        $settings=array_intersect_key(config(true),array_flip(array_values(config_fields()['admin'])));
+        $original=$settings;
+        $source=file_get_contents(is_file($file)?$file:__DIR__.'/config.example.ini');
+        if ($source===false) throw new RuntimeException('Cannot read configuration');
+        $result=$action($settings);
+        $changes=[];
+        foreach (config_fields()['admin'] as $name=>$key) {
+            $value=$settings[$key]??null;
+            if (in_array($key,['admin_user_id','homepage_blog_id'],true)) {
+                if ($value!==null && (!is_int($value) || $value<1)) throw new RuntimeException('Invalid configured ID');
+                $encoded=$value===null?'""':(string)$value;
+            } else {
+                if (!is_bool($value)) throw new RuntimeException('Invalid configured flag');
+                $encoded=$value?'true':'false';
+            }
+            if ($value!==$original[$key]) $changes[$name]=$encoded;
+        }
+        if ($changes || !is_file($file)) {
+            $lines=preg_split('/(?<=\n)/',$source);$out='';$section='';$seen=[];
+            foreach ($lines as $line) {
+                if (preg_match('/^\h*\[([^\]\r\n]+)\]\h*(?:;[^\r\n]*)?(?:\r?\n)?$/',$line,$match)) {
+                    if ($section==='admin' && $changes) { $out.=implode('',array_map(static fn($key,$value)=>$key.' = '.$value."\n",array_keys($changes),$changes));$changes=[]; }
+                    $section=$match[1];
+                }
+                if ($section==='admin' && preg_match('/^(\h*([a-z_]+)\h*=\h*)([^;\r\n]*)(;[^\r\n]*)?(\r?\n)?$/',$line,$match)) {
+                    $name=$match[2];
+                    if (isset($seen[$name])) throw new RuntimeException('Duplicate admin configuration key');
+                    $seen[$name]=true;
+                    if (isset($changes[$name])) {
+                        preg_match('/\h*$/',$match[3],$space);
+                        $line=$match[1].$changes[$name].$space[0].($match[4]??'').($match[5]??'');
+                        unset($changes[$name]);
+                    }
+                }
+                $out.=$line;
+            }
+            if ($changes) $out.="\n".($section==='admin'?'':"[admin]\n").implode('',array_map(static fn($key,$value)=>$key.' = '.$value."\n",array_keys($changes),$changes));
+            $temp=tempnam(dirname($file),'.config-');
+            if ($temp===false || dirname($temp)!==dirname($file)) throw new RuntimeException('Cannot prepare configuration');
+            if (file_put_contents($temp,$out)!==strlen($out) || !chmod($temp,0600) || !rename($temp,$file)) throw new RuntimeException('Cannot save configuration');
+        }
+        config(true);return $result;
+    } finally {
+        if ($temp && is_file($temp)) unlink($temp);
+        flock($lock,LOCK_UN);fclose($lock);
+    }
+}
+function reserved_names(): array {
+    return ['admin','administrator','api','login','logout','register','signup','manage','assets','static','style','style.css','health','robots.txt','posts','new','edit','delete','preview','_addons','blog.php','manage.php','favicon.ico','index.php','www','root','support','security','abuse','postmaster','webmaster','bin','src','config','storage','database','vendor','libraries','tests','.well-known'];
+}
+
+function section_reserved_names(): array { return array_merge(reserved_names(), ['inicio','blogs']); }
+
+function t(string $key): string {
+    if ($key==='brand') return config()['site_name'];
+    if ($key==='intro') return config()['site_description'];
+    static $strings;
+    $strings ??= parse_ini_file(__DIR__.'/strings.txt', false, INI_SCANNER_RAW);
+    if ($strings === false) throw new RuntimeException('Cannot read strings.txt');
+    return $strings[$key] ?? throw new LogicException('Missing translation: '.$key);
+}
+
 function db(): PDO {
     static $db;
     if (!$db) {

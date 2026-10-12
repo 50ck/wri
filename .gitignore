@@ -11,3 +11,6 @@ __pycache__/
 
 /extensions/mermaid/bin/mmdr
 /extensions/mermaid/bin/mmdr.new
+
+/config.ini
+/config.ini.lock

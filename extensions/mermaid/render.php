@@ -76,11 +76,14 @@ function sanitize_diagram_svg(string $svg,string $source): ?string {
 }
 function addon_mermaid_render(DOMDocument $doc,array $context): void {
     $diagramCount=0;$diagramDeadline=microtime(true)+6;
+    $binary=getenv('BLOG_MERMAID_BIN') ?: (config()['mermaid']['binary'] ?? '');
+    if ($binary==='') $binary=__DIR__.'/bin/mmdr';
+    elseif (!str_starts_with($binary,'/')) $binary=dirname(config()['config_file']).'/'.$binary;
     foreach (iterator_to_array($doc->getElementsByTagName('code')) as $code) {
         $language=substr($code->getAttribute('class'),9);
         if ($code->parentNode?->nodeName!=='pre') continue;
         if ($language==='mermaid') {
-            $svg=$diagramCount++<16 ? native_diagram($code->textContent,getenv('BLOG_MERMAID_BIN') ?: (config()['mermaid_bin'] ?? __DIR__.'/bin/mmdr'),$diagramDeadline) : null;
+            $svg=$diagramCount++<16 ? native_diagram($code->textContent,$binary,$diagramDeadline) : null;
             if ($svg!==null) {
                 $fragment=$doc->createDocumentFragment();
                 // HTML establishes the SVG namespace; avoid libxml's default: prefix.
