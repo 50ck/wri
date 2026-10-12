@@ -10,8 +10,8 @@ function initialize_database(): void {
         db()->exec('DROP TABLE IF EXISTS migrations');
     });
     update_settings(static function (array &$settings) {
-        $first=one('SELECT id FROM users ORDER BY id LIMIT 1');
-        if (!$settings['admin_initialized'] && ($settings['admin_user_id']!==null || $first)) { $settings['admin_user_id']??=$first['id'];$settings['admin_initialized']=true; }
+        $first=one('SELECT username FROM users ORDER BY id LIMIT 1');
+        if (!$settings['admin_initialized'] && ($settings['username'] || $first)) { if (!$settings['username']) $settings['username']=[$first['username']];$settings['admin_initialized']=true; }
     });
 }
 

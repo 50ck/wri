@@ -37,7 +37,9 @@ function page(string $key,callable $content,?string $error=null,?array $manageme
         echo '<header><h1 class="manage-title">'.e(t($title)).'</h1><nav aria-label="'.e(t($title)).'">';
         if ($admin) echo link_to('/admin.php/config','config').' '.link_to('/admin.php/users','users').' '.link_to('/manage','manage');
         else echo link_to('/manage/settings','settings').' '.link_to('/manage/sections','sections').' '.link_to('/manage/appearance','appearance').' '.link_to('/manage/addons','addons').(is_admin()?' '.link_to('/admin.php','admin'):'');
-        echo '</nav><div class="actions">'.link_to('/'.$management['username'],'blog').'<form class="inline" method="post" action="/logout">';token_field();button('logout');echo '</form></div></header>';
+        echo '</nav>';
+        if (!$admin) { echo '<div class="actions">'.link_to('/'.$management['username'],'blog').'<form class="inline" method="post" action="/logout">';token_field();button('logout');echo '</form></div>'; }
+        echo '</header>';
     }
     echo '<main id="main">'.($management?'<h2>':'<h1>').e(t($key)).($management?'</h2>':'</h1>');
     if ($error) echo '<p class="error" role="alert">'.e($error).'</p>';
@@ -56,6 +58,11 @@ function confirmation(string $key,string $help,string $cancel,?array $management
     page($key,function () use ($help,$cancel) {echo '<p>'.e(t($help)).'</p><form method="post">';token_field();echo '<div class="actions">'.link_to($cancel,'cancel');button('confirm');echo '</div></form>';},null,$management);
 }
 
+function admin_usernames(string $value): array {
+    $names=array_values(array_unique(array_filter(array_map(static fn($name)=>strtolower(trim($name)),explode(',',$value)),static fn($name)=>$name!=='')));
+    foreach ($names as $name) if (!preg_match('/\A[a-z0-9](?:[a-z0-9-]{1,22})[a-z0-9]\z/D',$name) || str_contains($name,'--') || in_array($name,reserved_names(),true)) throw new RuntimeException('Invalid admin username');
+    return $names;
+}
 function config(bool $reload=false): array {
     static $config;
     if ($reload) $config=null;
@@ -80,7 +87,8 @@ function config(bool $reload=false): array {
         $result[$key]=filter_var($result[$key],FILTER_VALIDATE_BOOLEAN,FILTER_NULL_ON_FAILURE);
         if ($result[$key]===null) throw new RuntimeException('Invalid configured flag');
     }
-    foreach (['admin_user_id','homepage_blog_id'] as $key) {
+    $result['username']=admin_usernames($result['username']);
+    foreach (['homepage_blog_id'] as $key) {
         $value=$result[$key];
         $result[$key]=$value===''?null:filter_var($value,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
         if ($result[$key]===false) throw new RuntimeException('Invalid configured ID');
@@ -105,7 +113,7 @@ function update_settings(callable $action,string $group='admin'): mixed {
     if (!$lock) throw new RuntimeException('Cannot lock configuration');
     try {
         if (!flock($lock,LOCK_EX)) throw new RuntimeException('Cannot lock configuration');
-        $keys=$group==='admin'?['admin_user_id','admin_initialized','allow_signups','homepage_blog_id']:['site_name','site_description'];
+        $keys=$group==='admin'?['username','admin_initialized','allow_signups','homepage_blog_id']:['site_name','site_description'];
         $settings=array_intersect_key(config(true),array_flip($keys));
         $original=$settings;
         $source=file_get_contents(is_file($file)?$file:__DIR__.'/config.example.ini');
@@ -117,7 +125,10 @@ function update_settings(callable $action,string $group='admin'): mixed {
             if ($group==='site') {
                 if (!is_string($value) || !mb_check_encoding($value,'UTF-8') || strpbrk($value,"\r\n\0")!==false || mb_strlen($value,'UTF-8')>($key==='site_name'?120:280) || ($key==='site_name' && trim($value)==='')) fail(422,'text_error');
                 $encoded='"'.str_replace(['\\','"'],['\\\\','\\"'],$value).'"';
-            } elseif (in_array($key,['admin_user_id','homepage_blog_id'],true)) {
+            } elseif ($key==='username') {
+                if (!is_array($value) || array_filter($value,static fn($name)=>!is_string($name)) || admin_usernames(implode(',',$value))!==$value) throw new RuntimeException('Invalid admin usernames');
+                $encoded='"'.implode(', ',$value).'"';
+            } elseif ($key==='homepage_blog_id') {
                 if ($value!==null && (!is_int($value) || $value<1)) throw new RuntimeException('Invalid configured ID');
                 $encoded=$value===null?'""':(string)$value;
             } else {
@@ -252,7 +263,7 @@ function current_user(): ?array {
 }
 function require_user(): array { return current_user() ?? throw new HttpError(401, t('login_required')); }
 function registration_open(): bool { return config()['registration'] && (bool)config()['allow_signups']; }
-function is_admin(): bool { $user=current_user();return $user!==null && (int)$user['id']===(int)(config()['admin_user_id']??0); }
+function is_admin(?array $user=null): bool { $user??=current_user();return $user!==null && in_array($user['username'],config()['username'],true); }
 function require_admin(): void { require_user();if (!is_admin()) fail(403,'forbidden'); }
 function save_platform_home(string $id): void {
     require_admin();
@@ -275,12 +286,16 @@ function admin_edit_user(int $id,string $name,string $password,string $confirm,s
     transaction(static function () use($id,$name,$hash,$visibility) {
         $user=admin_user($id);
         if (one('SELECT id FROM users WHERE username=? AND id<>?',[$name,$id]) || one('SELECT user_id FROM username_aliases WHERE username=? AND user_id<>?',[$name,$id])) fail(422,'username_taken');
-        if ($name!==$user['username']) {
-            query('DELETE FROM username_aliases WHERE username=? AND user_id=?',[$name,$id]);
-            query('INSERT INTO username_aliases(username,user_id) VALUES (?,?)',[$user['username'],$id]);
-        }
-        query('UPDATE users SET username=?,password_hash=?,auth_version=auth_version+?,updated_at=? WHERE id=?',[$name,$hash??$user['password_hash'],$hash===null?0:1,now(),$id]);
-        query('UPDATE blogs SET visibility=?,updated_at=? WHERE user_id=?',[$visibility,now(),$id]);
+        update_settings(static function (array &$settings) use($user,$id,$name,$hash,$visibility) {
+            require_admin();
+            if ($name!==$user['username']) {
+                query('DELETE FROM username_aliases WHERE username=? AND user_id=?',[$name,$id]);
+                query('INSERT INTO username_aliases(username,user_id) VALUES (?,?)',[$user['username'],$id]);
+                $settings['username']=array_values(array_unique(array_map(static fn($admin)=>$admin===$user['username']?$name:$admin,$settings['username'])));
+            }
+            query('UPDATE users SET username=?,password_hash=?,auth_version=auth_version+?,updated_at=? WHERE id=?',[$name,$hash??$user['password_hash'],$hash===null?0:1,now(),$id]);
+            query('UPDATE blogs SET visibility=?,updated_at=? WHERE user_id=?',[$visibility,now(),$id]);
+        });
     });
 }
 function admin_delete_user(int $id): void {
@@ -288,9 +303,9 @@ function admin_delete_user(int $id): void {
     rate_limit('admin-delete',(string)$admin['id'],10,900);
     transaction(static function () use($id) {
         $user=admin_user($id);
-        if ($id===(int)config()['admin_user_id']) fail(403,'forbidden');
+        if (is_admin($user)) fail(403,'forbidden');
         update_settings(static function (array &$settings) use($id,$user) {
-            require_admin();if ($id===$settings['admin_user_id']) fail(403,'forbidden');
+            require_admin();if (in_array($user['username'],$settings['username'],true)) fail(403,'forbidden');
             query('DELETE FROM users WHERE id=?',[$id]);
             if ($settings['homepage_blog_id']===$user['blog_id']) $settings['homepage_blog_id']=null;
         });
@@ -339,13 +354,14 @@ function register_account(string $name, string $password, string $confirm, bool 
     try {
         return transaction(fn()=>update_settings(function (array &$settings) use ($name,$hash,$byAdmin) {
             if ($byAdmin) require_admin();elseif (!registration_open()) fail(404,'not_found');
+            if (!$byAdmin && in_array($name,$settings['username'],true)) fail(422,'username_taken');
             if (one('SELECT user_id FROM username_aliases WHERE username=?',[$name])) fail(422,'username_taken');
             $time=now();
             query('INSERT INTO users(username,password_hash,created_at,updated_at) VALUES (?,?,?,?)',[$name,$hash,$time,$time]);
             $id=(int)db()->lastInsertId();
             query('INSERT INTO blogs(user_id,title,created_at,updated_at) VALUES (?,?,?,?)',[$id,$name,$time,$time]);
             enable_default_addons((int)db()->lastInsertId());
-            if (!$settings['admin_initialized']) {$settings['admin_user_id']=$id;$settings['admin_initialized']=true;}
+            if (!$settings['admin_initialized']) {if (!$settings['username']) $settings['username']=[$name];$settings['admin_initialized']=true;}
             return ['id'=>$id,'username'=>$name];
         }));
     } catch (PDOException $e) {
@@ -467,11 +483,11 @@ function save_settings(array $blog,string $title,string $description,string $vis
 }
 function delete_account(array $blog,string $password,string $confirmation): void {
     transaction(function () use ($blog,$password,$confirmation) {
-        if ((int)$blog['user_id']===(int)config()['admin_user_id']) fail(403,'forbidden');
         $user=one('SELECT * FROM users WHERE id=?',[$blog['user_id']]);
+        if ($user && is_admin($user)) fail(403,'forbidden');
         if (!$user || !password_check($password,$user['password_hash']) || !hash_equals($user['username'],$confirmation)) fail(422,'delete_error');
         update_settings(static function (array &$settings) use($user,$blog) {
-            if ((int)$blog['user_id']===$settings['admin_user_id']) fail(403,'forbidden');
+            if (in_array($user['username'],$settings['username'],true)) fail(403,'forbidden');
             query('DELETE FROM users WHERE id=?',[$user['id']]);
             if ($settings['homepage_blog_id']===(int)$blog['id']) $settings['homepage_blog_id']=null;
         });

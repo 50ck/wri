@@ -82,7 +82,7 @@ function admin_users(array $blog,?string $error=null): void {
             echo '<li><a href="/'.e($user['username']).'">'.e($user['username']).'</a>';
             echo ' <span class="section-actions">';
             icon_link('/admin.php/users/'.$user['user_id'].'/edit','edit','pencil');
-            if ((int)$user['user_id']!==(int)$platform['admin_user_id']) { echo ' ';icon_link('/admin.php/users/'.$user['user_id'].'/delete','delete','trash'); }
+            if (!is_admin($user)) { echo ' ';icon_link('/admin.php/users/'.$user['user_id'].'/delete','delete','trash'); }
             if ($user['visibility']==='public' && (int)$user['id']!==(int)$home) {
                 echo ' '.link_to('/admin.php/users/homepage?blog_id='.$user['id'],'use_blog_home');
             } elseif ($user['visibility']==='private') echo ' '.e(t('private'));
