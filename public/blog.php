@@ -113,7 +113,7 @@ function post_editor(array $blog,?array $post,?string $error=null): void {
         echo '<label for="section_id">'.e(t('section')).'</label><select id="section_id" name="section_id"><option value="">'.e(t('unsectioned')).'</option>';
         $selected=value('section_id',(string)($post['section_id']??''));
         foreach (section_list($blog['id']) as $section) echo '<option value="'.$section['id'].'"'.($selected===(string)$section['id']?' selected':'').'>'.e($section['title']).'</option>';
-        echo '</select>';area('body','content',value('body',$post['body_markdown']??''));
+        echo '</select><label for="body">'.e(t('post')).'</label>';area('body','post',value('body',$post['body_markdown']??''));
         echo '<div class="actions">';button($post?'save':'publish');echo link_to('/'.$blog['username'],'cancel').'</div></form>';
     },$error);
 }
