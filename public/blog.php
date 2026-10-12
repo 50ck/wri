@@ -42,6 +42,10 @@ function route_blog(string $path): void {
         headers_for($blog);send_header('Content-Type: text/css; charset=utf-8');echo addon_styles($blog).($blog['custom_css'] ?: file_get_contents(__DIR__.'/assets/blog.css'));return;
     }
     if ($tail===['preview']) { if (!is_owner($blog)) fail(403,'forbidden');render_blog($blog,null,null,true);return; }
+    if ($tail===['posts']) {
+        if (!has_unsectioned_posts($blog['id'])) fail(404,'not_found');
+        render_blog($blog,['id'=>null,'title'=>t('posts'),'slug'=>'posts','content_markdown'=>'']);return;
+    }
     if (count($tail)===1) {
         $section=one('SELECT * FROM sections WHERE blog_id=? AND slug=?',[$blog['id'],$tail[0]]);
         if (!$section) fail(404,'not_found');render_blog($blog,$section);return;
@@ -79,7 +83,7 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
     $path=$post?post_path($blog,$post):($section?'/'.$blog['username'].'/'.$section['slug']:$home);
     $posts=[];$more=false;
     if ($section && !$post) {
-        $posts=query('SELECT * FROM posts WHERE blog_id=? AND section_id=? AND deleted_at IS NULL ORDER BY published_at DESC,id DESC LIMIT 21 OFFSET ?',[$blog['id'],$section['id'],($page-1)*20])->fetchAll();
+        $posts=query('SELECT * FROM posts WHERE blog_id=? AND section_id IS ? AND deleted_at IS NULL ORDER BY published_at DESC,id DESC LIMIT 21 OFFSET ?',[$blog['id'],$section['id'],($page-1)*20])->fetchAll();
         if (!$posts && $page>1) fail(404,'not_found');
         if ($number!=='' && ($page===1 || $number!==(string)$page)) redirect($path.($page>1?'?page='.$page:''),308);
         $more=count($posts)>20;$posts=array_slice($posts,0,20);
@@ -98,6 +102,7 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
     if ($blog['description']!=='') echo '<p class="blog-description">'.e($blog['description']).'</p>';
     echo '<nav class="blog-nav" aria-label="'.e(t('sections')).'">';
     foreach (navigation_sections($blog['id']) as $item) echo '<a href="'.e($item['id']==='home'?$home:'/'.$blog['username'].'/'.$item['slug']).'">'.e($item['title']).'</a> ';
+    if (has_unsectioned_posts($blog['id'])) echo link_to('/'.$blog['username'].'/posts','posts').' ';
     addon_slot('nav',$blog);
     echo '</nav></header>';
     echo '<main class="blog-main" id="main">';
@@ -111,7 +116,7 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
     } else {
         echo '<section class="blog-section"><h2>'.e($section['title']);
         if ($owner) {
-            echo ' ';icon_link('/manage/sections/'.$section['id'].'/edit?from=section','edit','pencil');
+            if ($section['id']!==null) { echo ' ';icon_link('/manage/sections/'.$section['id'].'/edit?from=section','edit','pencil'); }
             echo ' ';icon_link('/'.$blog['username'].'/new?section_id='.$section['id'],'new_post','plus');
         }
         echo '</h2>'.$html.'</section>';
@@ -136,7 +141,7 @@ function post_editor(array $blog,?array $post,?string $error=null): void {
     page($post?'edit_post':'new_post',function () use ($blog,$post) {
         echo '<form method="post">';token_field();field('title','title',value('title',$post['title']??''),'text',true,200);
         echo '<label for="section_id">'.e(t('section')).'</label><select id="section_id" name="section_id"><option value="">'.e(t('unsectioned')).'</option>';
-        $default=$post ? $post['section_id'] : (input('section_id',$_GET) ?: (one('SELECT id FROM sections WHERE blog_id=? AND slug=?',[$blog['id'],'blogs'])['id']??null));
+        $default=$post ? $post['section_id'] : (array_key_exists('section_id',$_GET)?input('section_id',$_GET):(one('SELECT id FROM sections WHERE blog_id=? AND slug=?',[$blog['id'],'blogs'])['id']??null));
         $selected=value('section_id',(string)$default);
         foreach (section_list($blog['id']) as $section) echo '<option value="'.$section['id'].'"'.($selected===(string)$section['id']?' selected':'').'>'.e($section['title']).'</option>';
         echo '</select>';area('body','post',value('body',$post['body_markdown']??''));

@@ -455,6 +455,7 @@ function delete_section(array $blog,int $id): void {
     });
 }
 function owned_post(array $blog,int $id): array { return one('SELECT * FROM posts WHERE id=? AND blog_id=? AND deleted_at IS NULL',[$id,$blog['id']]) ?? throw new HttpError(404,t('not_found')); }
+function has_unsectioned_posts(int $blog): bool { return one('SELECT id FROM posts WHERE blog_id=? AND section_id IS NULL AND deleted_at IS NULL LIMIT 1',[$blog])!==null; }
 function save_post(array $blog,?int $id,string $title,string $body,?int $section): int {
     $title=text_field($title,200); $body=markdown_field($body);
     return transaction(function () use ($blog,$id,$title,$body,$section) {
