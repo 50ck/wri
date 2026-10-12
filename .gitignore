@@ -1,5 +1,4 @@
-/storage/*
-!/storage/.gitkeep
+/storage/
 /bin/
 /config/
 /tests/
