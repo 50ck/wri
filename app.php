@@ -466,9 +466,10 @@ function save_post(array $blog,?int $id,string $title,string $body,?int $section
         $time=now();
         if ($id) {
             $post=owned_post($blog,$id); $slug=$post['slug'];
-            if ($post['section_id'] !== $section) {
-                $slug=free_post_slug($blog['id'],$section,$slug,$id);
+            if ($title!==$post['title'] || $post['section_id']!==$section) $slug=free_post_slug($blog['id'],$section,$title!==$post['title']?slug_base($title):$slug,$id);
+            if ($slug!==$post['slug'] || $post['section_id']!==$section) {
                 remember_path($blog['id'],namespace_path($post['section_id'],$post['slug']),$id);
+                query('DELETE FROM redirects WHERE blog_id=? AND old_path=? AND post_id=?',[$blog['id'],namespace_path($section,$slug),$id]);
             }
             query('UPDATE posts SET title=?,body_markdown=?,section_id=?,slug=?,updated_at=? WHERE id=? AND blog_id=?',[$title,$body,$section,$slug,$time,$id,$blog['id']]);
             return $id;
