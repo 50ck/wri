@@ -9,8 +9,8 @@ function route_manage(string $path): void {
         }
         if (str_starts_with($path,'/manage/addons/')) { addon_route($blog,'manage',explode('/',substr($path,15)));return; }
         if ($path==='/manage/sections') { methods(['GET']);manage_sections($blog);return; }
-        if (preg_match('~\A/manage/sections/(home|blogs)/reorder\z~',$path,$m)) {
-            methods(['POST']);check_csrf();reorder_section($blog,$m[1],input('direction'));redirect('/manage/sections',303,'saved');
+        if ($path==='/manage/sections/home/reorder') {
+            methods(['POST']);check_csrf();reorder_section($blog,'home',input('direction'));redirect('/manage/sections',303,'saved');
         }
         if ($path==='/manage/sections/home') {
             methods(['GET','POST']);$error=submitted(function () use($blog) {save_home($blog,input('content'));redirect('/'.$blog['username'],303,'saved');});home_editor($blog,$error);return;
@@ -43,7 +43,7 @@ function route_manage(string $path): void {
 
 function section_editor(array $blog,?array $section,?string $error=null): void {
     page($section?'edit_section':'new_section',function () use ($section) {
-        echo '<form method="post">';token_field();field('title','title',value('title',$section['title']??''),'text',true,120);area('content','intro_content',value('content',$section['content_markdown']??''));
+        echo '<form method="post">';token_field();field('title','title',value('title',$section['title']??''),'text',true,120);area('content','content',value('content',$section['content_markdown']??''));
         echo '<div class="actions">';button('save');echo link_to('/manage/sections','cancel').'</div></form>';
     },$error,$blog);
 }
@@ -57,9 +57,9 @@ function manage_sections(array $blog): void {
             echo ' <form class="inline section-actions" method="post" action="'.$path.'/reorder">';token_field();
             if ($i>0) reorder_button('up');if ($i<count($sections)-1) reorder_button('down');echo '</form>';
             if ($section['id']==='home') echo ' <span class="section-actions">'.link_to('/manage/sections/home','edit').'</span>';
-            elseif ($section['id']!=='blogs') echo ' <span class="section-actions">'.link_to($path.'/edit','edit').' '.link_to($path.'/delete','delete').'</span>';
+            else echo ' <span class="section-actions">'.link_to($path.'/edit','edit').' '.link_to($path.'/delete','delete').'</span>';
             echo '</li>';
-        } echo '</ul>';if (count($sections)<12) echo link_to('/manage/sections/new','new_section');
+        } echo '</ul>';if (count($sections)<11) echo link_to('/manage/sections/new','new_section');
     },null,$blog);
 }
 

@@ -19,7 +19,7 @@ function field(string $name,string $key,string $value='',string $type='text',boo
 }
 
 function area(string $name,string $key,string $value='',bool $css=false): void {
-    if ($css) echo '<label for="'.e($name).'">'.e(t($key)).'</label>';
+    echo '<label for="'.e($name).'">'.e(t($key)).'</label>';
     echo '<textarea id="'.e($name).'" name="'.e($name).'"'.($css?' class="css-editor" spellcheck="false"':' aria-label="'.e(t($key)).'" aria-describedby="'.e($name).'-help"').'>'.e($value).'</textarea>';
     if (!$css) echo '<small id="'.e($name).'-help">'.e(t('markdown_help')).'</small>';
 }
@@ -160,7 +160,7 @@ function reserved_names(): array {
     return ['admin','administrator','api','login','logout','register','signup','manage','assets','static','style','style.css','health','robots.txt','posts','new','edit','delete','preview','_addons','blog.php','manage.php','admin.php','favicon.ico','index.php','www','root','support','security','abuse','postmaster','webmaster','bin','src','config','storage','database','vendor','libraries','tests','.well-known'];
 }
 
-function section_reserved_names(): array { return array_merge(reserved_names(), ['inicio','blogs']); }
+function section_reserved_names(): array { return array_merge(reserved_names(), ['inicio']); }
 
 function t(string $key): string {
     if ($key==='brand') return config()['site_name'];
@@ -366,7 +366,9 @@ function register_account(string $name, string $password, string $confirm, bool 
             query('INSERT INTO users(username,password_hash,created_at,updated_at) VALUES (?,?,?,?)',[$name,$hash,$time,$time]);
             $id=(int)db()->lastInsertId();
             query('INSERT INTO blogs(user_id,title,created_at,updated_at) VALUES (?,?,?,?)',[$id,$name,$time,$time]);
-            enable_default_addons((int)db()->lastInsertId());
+            $blog=(int)db()->lastInsertId();
+            query('INSERT INTO sections(blog_id,title,slug,sort_order,created_at,updated_at) VALUES (?,?,?,?,?,?)',[$blog,t('blogs'),'blogs',-1,$time,$time]);
+            enable_default_addons($blog);
             if (!$settings['username']) $settings['username']=[$name];
             return ['id'=>$id,'username'=>$name];
         }));
@@ -377,10 +379,9 @@ function register_account(string $name, string $password, string $confirm, bool 
 }
 function section_list(int $blog): array { return query('SELECT * FROM sections WHERE blog_id=? ORDER BY sort_order,id',[$blog])->fetchAll(); }
 function navigation_sections(int $blog): array {
-    $order=one('SELECT home_order,feed_order FROM blogs WHERE id=?',[$blog]);
+    $order=one('SELECT home_order FROM blogs WHERE id=?',[$blog]);
     $sections=array_merge([
         ['id'=>'home','slug'=>'','title'=>t('home'),'sort_order'=>$order['home_order']],
-        ['id'=>'blogs','slug'=>'blogs','title'=>t('blogs'),'sort_order'=>$order['feed_order']],
     ],section_list($blog));
     usort($sections,static fn($a,$b)=>$a['sort_order']<=>$b['sort_order']);
     return $sections;
@@ -426,13 +427,12 @@ function edit_section(array $blog,int $id,string $title,string $content): void {
 function reorder_section(array $blog,int|string $id,string $direction): void {
     if (!in_array($direction,['up','down'],true)) fail(400,'invalid');
     transaction(function () use ($blog,$id,$direction) {
-        if (!in_array($id,['home','blogs'],true)) owned_section($blog,(int)$id);
+        if ($id!=='home') owned_section($blog,(int)$id);
         $sections=navigation_sections($blog['id']);
         $index=array_search($id,array_column($sections,'id'),true); $other=$index+($direction==='up'?-1:1);
         if (isset($sections[$other])) [$sections[$index],$sections[$other]]=[$sections[$other],$sections[$index]];
         foreach ($sections as $order=>$section) {
             if ($section['id']==='home') query('UPDATE blogs SET home_order=?,updated_at=? WHERE id=?',[$order,now(),$blog['id']]);
-            elseif ($section['id']==='blogs') query('UPDATE blogs SET feed_order=?,updated_at=? WHERE id=?',[$order,now(),$blog['id']]);
             else query('UPDATE sections SET sort_order=?,updated_at=? WHERE id=? AND blog_id=?',[$order,now(),$section['id'],$blog['id']]);
         }
     });

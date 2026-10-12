@@ -30,7 +30,6 @@ CREATE TABLE IF NOT EXISTS blogs (
  custom_css TEXT NOT NULL DEFAULT '',
  home_markdown TEXT NOT NULL DEFAULT '',
  home_order INTEGER NOT NULL DEFAULT -2,
- feed_order INTEGER NOT NULL DEFAULT -1,
  created_at TEXT NOT NULL,
  updated_at TEXT NOT NULL
 );
