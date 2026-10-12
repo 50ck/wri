@@ -15,7 +15,7 @@ function route_admin(string $path): void {
             $name=text_field(input('site_name'),120);$description=text_field(input('site_description'),280,false);
             update_settings(static function (array &$settings) use($name,$description) {
                 require_admin();$settings['site_name']=$name;$settings['site_description']=$description;
-            },'site');redirect('/admin.php/config',303,'saved');
+            });redirect('/admin.php/config',303,'saved');
         });
         page('edit_site',function () {
             echo '<form method="post">';token_field();
@@ -67,16 +67,17 @@ function route_admin(string $path): void {
         });admin_user_delete($blog,$user,$error);return;
     }
     if ($path==='/admin.php/users/homepage') {
-        methods(['GET']);$id=input('blog_id',$_GET);
-        if ($id!=='' && (!ctype_digit($id) || !one("SELECT id FROM blogs WHERE id=? AND visibility='public'",[$id]))) fail(422,'invalid');
-        page('homepage',function () use($id) {
+        methods(['GET']);$name=input('username',$_GET);
+        if ($name!=='') $name=username($name);
+        if ($name!=='' && !one("SELECT b.id FROM blogs b JOIN users u ON u.id=b.user_id WHERE u.username=? AND b.visibility='public'",[$name])) fail(422,'invalid');
+        page('homepage',function () use($name) {
             echo '<p>'.e(t('restore_help')).'</p><form method="post" action="/admin.php/users">';token_field();
-            echo '<input type="hidden" name="blog_id" value="'.e($id).'"><div class="actions">'.link_to('/admin.php/users','cancel');button('confirm');echo '</div></form>';
+            echo '<input type="hidden" name="username" value="'.e($name).'"><div class="actions">'.link_to('/admin.php/users','cancel');button('confirm');echo '</div></form>';
         },null,$blog);return;
     }
     if ($path==='/admin.php/users') {
         methods(['GET','POST']);
-        $error=submitted(function () {save_platform_home(input('blog_id'));redirect('/admin.php/users',303,'saved');});
+        $error=submitted(function () {save_platform_home(input('username'));redirect('/admin.php/users',303,'saved');});
         admin_users($blog,$error);return;
     }
     fail(404,'not_found');
@@ -84,8 +85,8 @@ function route_admin(string $path): void {
 
 function admin_users(array $blog,?string $error=null): void {
     page('users',function () use($blog) {
-        $platform=config();$home=$platform['homepage_blog_id'];
-        if ($home!==null) echo '<ul class="section-list"><li>'.link_to('/admin.php/users/homepage','use_platform_home').'</li></ul>';
+        $platform=config();$home=$platform['homepage'];
+        if ($home!=='') echo '<ul class="section-list"><li>'.link_to('/admin.php/users/homepage','use_platform_home').'</li></ul>';
         $number=input('page',$_GET);
         if ($number!=='' && (!ctype_digit($number) || (int)$number<1 || (int)$number>10000)) fail(400,'invalid');
         $page=max(1,(int)$number);
@@ -97,8 +98,8 @@ function admin_users(array $blog,?string $error=null): void {
             icon_link('/admin.php/users/'.$user['user_id'].'/edit','edit','pencil');
             if (!is_admin($user)) { echo ' ';icon_link('/admin.php/users/'.$user['user_id'].'/delete','delete','trash'); }
             if ($user['user_id']!==$blog['user_id']) echo ' '.link_to('/admin.php/users/'.$user['user_id'].'/admin?enabled='.(is_admin($user)?'0':'1'),is_admin($user)?'remove_admin':'grant_admin');
-            if ($user['visibility']==='public' && (int)$user['id']!==(int)$home) {
-                echo ' '.link_to('/admin.php/users/homepage?blog_id='.$user['id'],'use_blog_home');
+            if ($user['visibility']==='public' && $user['username']!==$home) {
+                echo ' '.link_to('/admin.php/users/homepage?username='.e($user['username']),'use_blog_home');
             } elseif ($user['visibility']==='private') echo ' '.e(t('private'));
             echo '</span></li>';
         }

@@ -3,7 +3,7 @@ declare(strict_types=1);
 if (PHP_SAPI!=='cli') { http_response_code(404);exit; }
 // Pin the official release and verify its published archive digest before extraction.
 if (PHP_OS_FAMILY!=='Linux' || php_uname('m')!=='x86_64') {
-    fwrite(STDERR,"Install mmdr 0.3.1 for your platform and set BLOG_MERMAID_BIN. See README.md.\n");exit(1);
+    fwrite(STDERR,"Install mmdr 0.3.1 for your platform in addons/mermaid/bin/mmdr. See README.md.\n");exit(1);
 }
 $root=__DIR__;$dir=sys_get_temp_dir().'/blog-renderer-'.bin2hex(random_bytes(8));mkdir($dir,0700);
 $exitCode=0;

@@ -4,12 +4,10 @@ require dirname(__DIR__).'/app.php';
 function route_index(string $path): void {
     if ($path==='/') {
         methods(['GET']);
-        $home=config()['homepage_blog_id'];
-        if ($home!==null) {
-            $blog=one('SELECT b.*,u.username FROM blogs b JOIN users u ON u.id=b.user_id WHERE b.id=?',[$home]);
-            if (!$blog) fail(404,'unavailable');
-            require_once __DIR__.'/blog.php';
-            can_read($blog);render_blog($blog);return;
+        $home=config()['homepage'];
+        if ($home!=='') {
+            $blog=one('SELECT b.*,u.username FROM blogs b JOIN users u ON u.id=b.user_id WHERE u.username=?',[$home]);
+            if ($blog) { require_once __DIR__.'/blog.php';can_read($blog);render_blog($blog);return; }
         }
         page('brand',function () {
             echo '<p>'.e(t('intro')).'</p>';

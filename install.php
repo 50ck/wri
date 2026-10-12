@@ -9,10 +9,7 @@ function initialize_database(): void {
         db()->exec(initial_schema());
         db()->exec('DROP TABLE IF EXISTS migrations');
     });
-    update_settings(static function (array &$settings) {
-        $first=one('SELECT username FROM users ORDER BY id LIMIT 1');
-        if (!$settings['admin_initialized'] && ($settings['username'] || $first)) { if (!$settings['username']) $settings['username']=[$first['username']];$settings['admin_initialized']=true; }
-    });
+    update_settings(static function (array &$settings) {});
 }
 
 function initial_schema(): string { return <<<'SQL'
@@ -96,9 +93,9 @@ SQL;
 if (realpath($_SERVER['SCRIPT_FILENAME']??'')!==__FILE__) return;
 try {
     if (PHP_VERSION_ID < 80400 || !extension_loaded('pdo_sqlite') || !extension_loaded('mbstring') || !extension_loaded('dom')) throw new RuntimeException('PHP 8.4+, pdo_sqlite, mbstring and dom are required.');
-    foreach ([dirname(config()['database']), config()['session_path'], dirname(config()['config_file'])] as $dir) if (!is_dir($dir) && !mkdir($dir, 0700, true)) throw new RuntimeException('Cannot create storage.');
-    if (dirname(config()['database']) === __DIR__.'/storage') chmod(dirname(config()['database']), 0700);
-    chmod(config()['session_path'], 0700);
-    initialize_database(); chmod(config()['database'], 0600);
+    foreach ([dirname(BLOG_DATABASE), BLOG_SESSION_PATH, dirname(config()['config_file'])] as $dir) if (!is_dir($dir) && !mkdir($dir, 0700, true)) throw new RuntimeException('Cannot create storage.');
+    chmod(dirname(BLOG_DATABASE), 0700);
+    chmod(BLOG_SESSION_PATH, 0700);
+    initialize_database(); chmod(BLOG_DATABASE, 0600);
     echo "Database ready. Configure Nginx and PHP-FPM; see README.md.\n";
 } catch (Throwable $e) { fwrite(STDERR, $e->getMessage() . "\n"); exit(1); }

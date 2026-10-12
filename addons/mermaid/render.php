@@ -76,9 +76,7 @@ function sanitize_diagram_svg(string $svg,string $source): ?string {
 }
 function addon_mermaid_render(DOMDocument $doc,array $context): void {
     $diagramCount=0;$diagramDeadline=microtime(true)+6;
-    $binary=getenv('BLOG_MERMAID_BIN') ?: (config()['mermaid']['binary'] ?? '');
-    if ($binary==='') $binary=__DIR__.'/bin/mmdr';
-    elseif (!str_starts_with($binary,'/')) $binary=dirname(config()['config_file']).'/'.$binary;
+    $binary=__DIR__.'/bin/mmdr';
     foreach (iterator_to_array($doc->getElementsByTagName('code')) as $code) {
         $language=substr($code->getAttribute('class'),9);
         if ($code->parentNode?->nodeName!=='pre') continue;

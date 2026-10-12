@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 umask(0077);
+const BLOG_DATABASE = __DIR__.'/storage/blog.sqlite';
+const BLOG_SESSION_PATH = __DIR__.'/storage/sessions';
 require_once __DIR__.'/addons.php';
 require_once __DIR__.'/markdown.php';
 function e(mixed $value): string { return htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
@@ -75,7 +77,7 @@ function config(bool $reload=false): array {
     if ($defaults===false || $settings===false) throw new RuntimeException('Invalid configuration file');
     $values=array_replace_recursive($defaults,$settings);
     $result=$values;
-    foreach (['site','admin','storage','limits','sessions','passwords'] as $section) foreach ($defaults[$section] as $key=>$default) {
+    foreach (['site','admin','limits'] as $section) foreach ($defaults[$section] as $key=>$default) {
         $value=$values[$section][$key]??null;
         if (!is_string($value)) throw new RuntimeException('Invalid configuration value');
         $override=getenv('BLOG_'.strtoupper($key));
@@ -83,23 +85,16 @@ function config(bool $reload=false): array {
         $result[$key]=$value;
     }
     foreach (['site_name','site_description'] as $key) $result[$key]=strtr($result[$key],['\\"'=>'"','\\\\'=>'\\']);
-    foreach (['registration','debug','admin_initialized','allow_signups'] as $key) {
+    foreach (['registration','allow_signups'] as $key) {
         $result[$key]=filter_var($result[$key],FILTER_VALIDATE_BOOLEAN,FILTER_NULL_ON_FAILURE);
         if ($result[$key]===null) throw new RuntimeException('Invalid configured flag');
     }
     $result['username']=admin_usernames($result['username']);
-    foreach (['homepage_blog_id'] as $key) {
-        $value=$result[$key];
-        $result[$key]=$value===''?null:filter_var($value,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
-        if ($result[$key]===false) throw new RuntimeException('Invalid configured ID');
-    }
-    foreach (['request_limit'=>[1,16777216],'body_limit'=>[1,16777216],'css_limit'=>[1,16777216],'post_limit'=>[1,1000000],'session_lifetime'=>[60,31536000],'argon_memory'=>[8192,1048576],'argon_time'=>[1,10],'bcrypt_cost'=>[4,16]] as $key=>[$min,$max]) {
+    $result['homepage']=strtolower(trim($result['homepage']));
+    if ($result['homepage']!=='' && admin_usernames($result['homepage'])!==[$result['homepage']]) throw new RuntimeException('Invalid homepage username');
+    foreach (['request_limit'=>[1,16777216],'body_limit'=>[1,16777216],'css_limit'=>[1,16777216],'post_limit'=>[1,1000000]] as $key=>[$min,$max]) {
         $result[$key]=filter_var($result[$key],FILTER_VALIDATE_INT,['options'=>['min_range'=>$min,'max_range'=>$max]]);
         if ($result[$key]===false) throw new RuntimeException('Invalid configured limit');
-    }
-    foreach (['database','session_path'] as $key) {
-        if ($result[$key]==='' || str_contains($result[$key],"\0")) throw new RuntimeException('Invalid storage path');
-        if (!str_starts_with($result[$key],'/')) $result[$key]=dirname($file).'/'.$result[$key];
     }
     $result['base_url']=rtrim($result['base_url'],'/');
     $url=parse_url($result['base_url']);
@@ -107,55 +102,51 @@ function config(bool $reload=false): array {
     $result['config_file']=$file;
     return $config=$result;
 }
-function update_settings(callable $action,string $group='admin'): mixed {
-    if (!in_array($group,['admin','site'],true)) throw new RuntimeException('Invalid configuration group');
+function update_settings(callable $action): mixed {
     $file=config()['config_file'];$lock=fopen($file.'.lock','c');$temp=null;
     if (!$lock) throw new RuntimeException('Cannot lock configuration');
     try {
         if (!flock($lock,LOCK_EX)) throw new RuntimeException('Cannot lock configuration');
-        $keys=$group==='admin'?['username','admin_initialized','allow_signups','homepage_blog_id']:['site_name','site_description'];
-        $settings=array_intersect_key(config(true),array_flip($keys));
-        $original=$settings;
+        $fields=['username'=>'admin','site_name'=>'site','site_description'=>'site','allow_signups'=>'site','homepage'=>'site'];
+        $settings=array_intersect_key(config(true),$fields);$original=$settings;
+        if (!$settings['username'] && ($first=one('SELECT username FROM users ORDER BY id LIMIT 1'))) $settings['username']=[$first['username']];
         $source=file_get_contents(is_file($file)?$file:__DIR__.'/config.example.ini');
         if ($source===false) throw new RuntimeException('Cannot read configuration');
-        $result=$action($settings);
-        $changes=[];
-        foreach ($keys as $key) {
+        $result=$action($settings);$changes=[];
+        foreach ($fields as $key=>$group) {
             $value=$settings[$key]??null;
-            if ($group==='site') {
-                if (!is_string($value) || !mb_check_encoding($value,'UTF-8') || strpbrk($value,"\r\n\0")!==false || mb_strlen($value,'UTF-8')>($key==='site_name'?120:280) || ($key==='site_name' && trim($value)==='')) fail(422,'text_error');
-                $encoded='"'.str_replace(['\\','"'],['\\\\','\\"'],$value).'"';
-            } elseif ($key==='username') {
+            if ($key==='username') {
                 if (!is_array($value) || array_filter($value,static fn($name)=>!is_string($name)) || admin_usernames(implode(',',$value))!==$value) throw new RuntimeException('Invalid admin usernames');
                 $encoded='"'.implode(', ',$value).'"';
-            } elseif ($key==='homepage_blog_id') {
-                if ($value!==null && (!is_int($value) || $value<1)) throw new RuntimeException('Invalid configured ID');
-                $encoded=$value===null?'""':(string)$value;
-            } else {
+            } elseif ($key==='allow_signups') {
                 if (!is_bool($value)) throw new RuntimeException('Invalid configured flag');
                 $encoded=$value?'true':'false';
+            } else {
+                if (!is_string($value) || !mb_check_encoding($value,'UTF-8') || strpbrk($value,"\r\n\0")!==false || mb_strlen($value,'UTF-8')>($key==='site_name'?120:280) || ($key==='site_name' && trim($value)==='')) fail(422,'text_error');
+                if ($key==='homepage' && $value!=='' && admin_usernames($value)!==[$value]) throw new RuntimeException('Invalid homepage username');
+                $encoded='"'.str_replace(['\\','"'],['\\\\','\\"'],$value).'"';
             }
-            if ($value!==$original[$key]) $changes[$key]=$encoded;
+            if ($value!==$original[$key]) $changes[$group][$key]=$encoded;
         }
         if ($changes || !is_file($file)) {
-            $lines=preg_split('/(?<=\n)/',$source);$out='';$section='';$seen=[];
-            foreach ($lines as $line) {
-                if (preg_match('/^\h*\[([^\]\r\n]+)\]\h*(?:;[^\r\n]*)?(?:\r?\n)?$/',$line,$match)) {
-                    if ($section===$group && $changes) { $out.=implode('',array_map(static fn($key,$value)=>$key.' = '.$value."\n",array_keys($changes),$changes));$changes=[]; }
-                    $section=$match[1];
-                }
-                if ($section===$group && preg_match('/^(\h*([a-z_]+)\h*=\h*)("(?:\\\\.|[^"\\\\])*"|[^;\r\n]*?)(\h*(?:;[^\r\n]*)?)(\r?\n)?$/',$line,$match)) {
-                    $name=$match[2];
-                    if (isset($seen[$name])) throw new RuntimeException('Duplicate configuration key');
-                    $seen[$name]=true;
-                    if (isset($changes[$name])) {
-                        $line=$match[1].$changes[$name].($match[4]??'').($match[5]??'');
-                        unset($changes[$name]);
-                    }
+            $out='';$section='';$seen=[];
+            $append=static function () use(&$out,&$changes,&$section) {
+                foreach ($changes[$section]??[] as $key=>$value) $out.=$key.' = '.$value."\n";
+                unset($changes[$section]);
+            };
+            foreach (preg_split('/(?<=\n)/',$source) as $line) {
+                if (preg_match('/^\h*\[([^\]\r\n]+)\]\h*(?:;[^\r\n]*)?(?:\r?\n)?$/',$line,$match)) { $append();$section=$match[1]; }
+                if (preg_match('/^(\h*([a-z_]+)\h*=\h*)("(?:\\\\.|[^"\\\\])*"|[^;\r\n]*?)(\h*(?:;[^\r\n]*)?)(\r?\n)?$/',$line,$match) && isset($fields[$match[2]]) && $fields[$match[2]]===$section) {
+                    $key=$match[2];
+                    if (isset($seen[$key])) throw new RuntimeException('Duplicate configuration key');
+                    $seen[$key]=true;
+                    if (isset($changes[$section][$key])) { $line=$match[1].$changes[$section][$key].($match[4]??'').($match[5]??'');unset($changes[$section][$key]); }
                 }
                 $out.=$line;
             }
-            if ($changes) $out.="\n".($section===$group?'':"[$group]\n").implode('',array_map(static fn($key,$value)=>$key.' = '.$value."\n",array_keys($changes),$changes));
+            if (!str_ends_with($out,"\n")) $out.="\n";
+            $append();
+            foreach ($changes as $section=>$values) { $out.="\n[$section]\n";foreach ($values as $key=>$value) $out.=$key.' = '.$value."\n"; }
             $temp=tempnam(dirname($file),'.config-');
             if ($temp===false || dirname($temp)!==dirname($file)) throw new RuntimeException('Cannot prepare configuration');
             if (file_put_contents($temp,$out)!==strlen($out) || !chmod($temp,0600) || !rename($temp,$file)) throw new RuntimeException('Cannot save configuration');
@@ -184,7 +175,7 @@ function t(string $key): string {
 function db(): PDO {
     static $db;
     if (!$db) {
-        $db = new PDO('sqlite:' . config()['database'], null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
+        $db = new PDO('sqlite:' . BLOG_DATABASE, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
         $db->exec('PRAGMA foreign_keys = ON');
         $db->exec('PRAGMA busy_timeout = 5000');
     }
@@ -238,9 +229,9 @@ function validate_password(string $password, string $confirm): void {
     if (!hash_equals($password, $confirm)) fail(422, 'confirmation_error');
 }
 function password_make(string $password): string {
-    if (in_array('argon2id', password_algos(), true)) return password_hash($password, PASSWORD_ARGON2ID, ['memory_cost'=>config()['argon_memory'], 'time_cost'=>config()['argon_time'], 'threads'=>1]);
+    if (in_array('argon2id', password_algos(), true)) return password_hash($password, PASSWORD_ARGON2ID, ['memory_cost'=>65536, 'time_cost'=>3, 'threads'=>1]);
     // Hash the complete Unicode password before bcrypt, avoiding its 72-byte truncation.
-    return 'sha384:' . password_hash(base64_encode(hash('sha384', $password, true)), PASSWORD_BCRYPT, ['cost'=>config()['bcrypt_cost']]);
+    return 'sha384:' . password_hash(base64_encode(hash('sha384', $password, true)), PASSWORD_BCRYPT, ['cost'=>12]);
 }
 function password_check(string $password, string $hash): bool {
     if (strlen($password) > 1024 || str_contains($password, "\0")) return false;
@@ -250,27 +241,30 @@ function password_check(string $password, string $hash): bool {
 function start_session(): void {
     $c = config();
     ini_set('session.use_strict_mode', '1'); ini_set('session.use_only_cookies', '1'); ini_set('session.use_trans_sid', '0');
-    ini_set('session.gc_maxlifetime', (string)$c['session_lifetime']);
-    session_save_path($c['session_path']);
+    ini_set('session.gc_maxlifetime', '86400');
+    session_save_path(BLOG_SESSION_PATH);
     session_name(parse_url($c['base_url'], PHP_URL_SCHEME) === 'https' ? '__Host-blog_session' : 'blog_session');
     session_set_cookie_params(['lifetime'=>0,'path'=>'/','secure'=>parse_url($c['base_url'], PHP_URL_SCHEME)==='https','httponly'=>true,'samesite'=>'Lax']);
     session_start();
-    if (isset($_SESSION['issued']) && time() - $_SESSION['issued'] > $c['session_lifetime']) { $_SESSION = []; session_regenerate_id(true); }
+    if (isset($_SESSION['issued']) && time() - $_SESSION['issued'] > 86400) { $_SESSION = []; session_regenerate_id(true); }
 }
 function current_user(): ?array {
     $user=isset($_SESSION['user_id']) ? one('SELECT * FROM users WHERE id=?', [$_SESSION['user_id']]) : null;
     return $user && (int)$user['auth_version']===(int)($_SESSION['auth_version']??0) ? $user : null;
 }
 function require_user(): array { return current_user() ?? throw new HttpError(401, t('login_required')); }
-function registration_open(): bool { return config()['registration'] && (bool)config()['allow_signups']; }
-function is_admin(?array $user=null): bool { $user??=current_user();return $user!==null && in_array($user['username'],config()['username'],true); }
+function registration_open(): bool { return config()['registration'] && config()['allow_signups']; }
+function is_admin(?array $user=null): bool {
+    $user??=current_user();if (!$user) return false;
+    return config()['username'] ? in_array($user['username'],config()['username'],true) : ($user['user_id']??$user['id'])===(one('SELECT id FROM users ORDER BY id LIMIT 1')['id']??null);
+}
 function require_admin(): void { require_user();if (!is_admin()) fail(403,'forbidden'); }
-function save_platform_home(string $id): void {
-    require_admin();
-    update_settings(static function (array &$settings) use($id) {
+function save_platform_home(string $name): void {
+    require_admin();$name=$name===''?'':username($name);
+    update_settings(static function (array &$settings) use($name) {
         require_admin();
-        if ($id!=='' && (!ctype_digit($id) || !one("SELECT id FROM blogs WHERE id=? AND visibility='public'",[$id]))) fail(422,'invalid');
-        $settings['homepage_blog_id']=$id===''?null:(int)$id;
+        if ($name!=='' && !one("SELECT b.id FROM blogs b JOIN users u ON u.id=b.user_id WHERE u.username=? AND b.visibility='public'",[$name])) fail(422,'invalid');
+        $settings['homepage']=$name;
     });
 }
 function authenticate(int $id): void { session_regenerate_id(true); $_SESSION = ['user_id'=>$id,'auth_version'=>(int)one('SELECT auth_version FROM users WHERE id=?',[$id])['auth_version'],'issued'=>time(),'csrf'=>bin2hex(random_bytes(32))]; }
@@ -301,6 +295,7 @@ function admin_edit_user(int $id,string $name,string $password,string $confirm,s
         update_settings(static function (array &$settings) use($user,$id,$name,$hash,$visibility) {
             require_admin();
             if ($name!==$user['username']) {
+                if ($settings['homepage']===$user['username']) $settings['homepage']=$name;
                 query('DELETE FROM username_aliases WHERE username=? AND user_id=?',[$name,$id]);
                 query('INSERT INTO username_aliases(username,user_id) VALUES (?,?)',[$user['username'],$id]);
                 $settings['username']=array_values(array_unique(array_map(static fn($admin)=>$admin===$user['username']?$name:$admin,$settings['username'])));
@@ -319,7 +314,7 @@ function admin_delete_user(int $id): void {
         update_settings(static function (array &$settings) use($id,$user) {
             require_admin();if (in_array($user['username'],$settings['username'],true)) fail(403,'forbidden');
             query('DELETE FROM users WHERE id=?',[$id]);
-            if ($settings['homepage_blog_id']===$user['blog_id']) $settings['homepage_blog_id']=null;
+            if ($settings['homepage']===$user['username']) $settings['homepage']='';
         });
     });
 }
@@ -373,7 +368,7 @@ function register_account(string $name, string $password, string $confirm, bool 
             $id=(int)db()->lastInsertId();
             query('INSERT INTO blogs(user_id,title,created_at,updated_at) VALUES (?,?,?,?)',[$id,$name,$time,$time]);
             enable_default_addons((int)db()->lastInsertId());
-            if (!$settings['admin_initialized']) {if (!$settings['username']) $settings['username']=[$name];$settings['admin_initialized']=true;}
+            if (!$settings['username']) $settings['username']=[$name];
             return ['id'=>$id,'username'=>$name];
         }));
     } catch (PDOException $e) {
@@ -501,7 +496,7 @@ function delete_account(array $blog,string $password,string $confirmation): void
         update_settings(static function (array &$settings) use($user,$blog) {
             if (in_array($user['username'],$settings['username'],true)) fail(403,'forbidden');
             query('DELETE FROM users WHERE id=?',[$user['id']]);
-            if ($settings['homepage_blog_id']===(int)$blog['id']) $settings['homepage_blog_id']=null;
+            if ($settings['homepage']===$user['username']) $settings['homepage']='';
         });
     });
 }
@@ -551,7 +546,6 @@ function run(): void {
         ob_clean();
         // Never log request values, passwords, cookies, or exception messages containing data.
         error_log('Blog error '.get_class($e).' in '.basename($e->getFile()).':'.$e->getLine());
-        if (config()['debug']) foreach ($e->getTrace() as $frame) error_log('Blog trace '.basename($frame['file'] ?? '').':'.($frame['line'] ?? 0).' '.($frame['function'] ?? ''));
         http_response_code(500);page('error',function () {echo '<p>'.e(t('server_error')).'</p>';});
     } finally { ob_end_flush(); }
 }
