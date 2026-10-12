@@ -20,6 +20,7 @@ small, time { color: #b5b5b5; }
 .feedback { font-weight: 600; }
 .inline { display: inline; }
 .inline button { padding: .15rem .5rem; }
+.inline button.icon { padding: 0; background: none; color: #9fc3e8; }
 ul { padding-left: 1.4rem; }
 .section-list li { margin: 1rem 0; }
 .section-actions { margin-left: .5rem; font-size: .85rem; }

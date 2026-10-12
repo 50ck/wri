@@ -119,16 +119,17 @@ function manage_sections(array $blog): void {
         foreach ($sections as $i=>$section) {
             $path='/manage/sections/'.$section['id'];
             echo '<li><a href="/'.e($blog['username']).($section['slug']!==''?'/'.e($section['slug']):'').'">'.e($section['title']).'</a>';
+            echo ' <form class="inline section-actions" method="post" action="'.$path.'/reorder">';token_field();
+            if ($i>0) reorder_button('up');if ($i<count($sections)-1) reorder_button('down');echo '</form>';
             if ($section['id']==='home') echo ' <span class="section-actions">'.link_to('/manage/sections/home','edit').'</span>';
             elseif ($section['id']!=='blogs') echo ' <span class="section-actions">'.link_to($path.'/edit','edit').' '.link_to($path.'/delete','delete').'</span>';
-            echo ' <form class="inline" method="post" action="'.$path.'/reorder">';token_field();
-            if ($i>0) reorder_button('up');if ($i<count($sections)-1) reorder_button('down');echo '</form></li>';
+            echo '</li>';
         } echo '</ul>';if (count($sections)<12) echo link_to('/manage/sections/new','new_section');
     },null,$blog);
 }
 function reorder_button(string $direction): void {
     $path=$direction==='up'?'M8 14V2M3 7l5-5 5 5':'M8 2v12M3 9l5 5 5-5';
-    echo '<button type="submit" name="direction" value="'.$direction.'" aria-label="'.e(t($direction)).'" title="'.e(t($direction)).'"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="'.$path.'"/></svg></button>';
+    echo '<button class="icon" type="submit" name="direction" value="'.$direction.'" aria-label="'.e(t($direction)).'" title="'.e(t($direction)).'"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="'.$path.'"/></svg></button> ';
 }
 function manage_appearance(array $blog,?string $error=null): void {
     page('appearance',function () use ($blog) {
