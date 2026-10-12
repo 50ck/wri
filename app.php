@@ -33,6 +33,7 @@ function page(string $key,callable $content,?string $error=null,?array $manageme
     headers_for(addonStyles:$styles);
     echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e($key==='brand'?t('brand'):t($key).' · '.t('brand')).'</title>';
     if ($key==='brand' && t('intro')!=='') echo '<meta name="description" content="'.e(t('intro')).'">';
+    if ($key==='brand') echo '<link rel="canonical" href="'.e(config()['base_url'].'/').'">';
     echo '<link rel="stylesheet" href="/assets/base.css">';
     foreach ($styles as $id) echo '<link rel="stylesheet" href="/_addons/'.e($id).'/style.css">';
     echo '</head><body>';
@@ -479,6 +480,7 @@ function delete_post(array $blog,int $id): void {
     query('UPDATE posts SET deleted_at=?,updated_at=? WHERE id=? AND blog_id=?',[now(),now(),$id,$blog['id']]);
 }
 function post_path(array $blog,array $post): string { return '/'.$blog['username'].'/'.namespace_path($post['section_id'],$post['slug']); }
+function blog_home_path(array $blog): string { return config()['homepage']===$blog['username']?'/':'/'.$blog['username']; }
 function save_css(array $blog,string $css): void {
     if (strlen($css)>config()['css_limit']) fail(413,'too_large');
     query('UPDATE blogs SET custom_css=?,updated_at=? WHERE id=? AND user_id=?',[$css,now(),$blog['id'],$blog['user_id']]);
