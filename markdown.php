@@ -1,6 +1,17 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__.'/libraries/parsedown/Parsedown.php';
+function markdown_own_link(string $href,?array $blog): bool {
+    if (str_starts_with($href,'#')) return true;
+    if (!$blog || !($url=parse_url($href))) return false;
+    if (isset($url['scheme']) || isset($url['host'])) {
+        $origin=parse_url(config()['base_url']);
+        foreach (['scheme','host'] as $key) if (strtolower($url[$key]??'')!==strtolower($origin[$key])) return false;
+        if (isset($url['user']) || ($url['port']??(strtolower($url['scheme'])==='https'?443:80))!==($origin['port']??($origin['scheme']==='https'?443:80))) return false;
+    }
+    $path=$url['path']??'';$home='/'.$blog['username'];
+    return !preg_match('~(?:^|/)(?:\.|\.\.)(?:/|$)~',$path) && ($path===$home || str_starts_with($path,$home.'/'));
+}
 function markdown_image_url(string $url): ?string {
     if (strlen($url)>512 || preg_match('/[\x00-\x20\x7f\\\\;<>"\']/', $url) || !filter_var($url,FILTER_VALIDATE_URL)) return null;
     $parts=parse_url($url); $host=strtolower($parts['host'] ?? '');
@@ -51,7 +62,7 @@ function markdown(string $body,?array $blog=null): string {
         }
         if ($marker || $language) $node->setAttribute('class',$marker ?? 'language-'.$language);
         if ($alignment) $node->setAttribute('class','markdown-align-'.$alignment);
-        if ($node->nodeName==='a') $node->setAttribute('rel','nofollow noreferrer');
+        if ($node->nodeName==='a') $node->setAttribute('rel',markdown_own_link($node->getAttribute('href'),$blog)?'noreferrer':'ugc nofollow noreferrer');
         if (preg_match('/\Ah[1-6]\z/', $node->nodeName)) $headings[]=$node;
         if ($node->nodeName==='table') $tables[]=$node;
         if ($node->nodeName==='blockquote') $quotes[]=$node;
