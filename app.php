@@ -86,10 +86,8 @@ function config(bool $reload=false): array {
         $result[$key]=$value;
     }
     foreach (['site_name','site_description'] as $key) $result[$key]=strtr($result[$key],['\\"'=>'"','\\\\'=>'\\']);
-    foreach (['registration','allow_signups'] as $key) {
-        $result[$key]=filter_var($result[$key],FILTER_VALIDATE_BOOLEAN,FILTER_NULL_ON_FAILURE);
-        if ($result[$key]===null) throw new RuntimeException('Invalid configured flag');
-    }
+    $result['allow_signups']=filter_var($result['allow_signups'],FILTER_VALIDATE_BOOLEAN,FILTER_NULL_ON_FAILURE);
+    if ($result['allow_signups']===null) throw new RuntimeException('Invalid configured flag');
     $result['username']=admin_usernames($result['username']);
     $result['homepage']=strtolower(trim($result['homepage']));
     if ($result['homepage']!=='' && admin_usernames($result['homepage'])!==[$result['homepage']]) throw new RuntimeException('Invalid homepage username');
@@ -254,7 +252,7 @@ function current_user(): ?array {
     return $user && (int)$user['auth_version']===(int)($_SESSION['auth_version']??0) ? $user : null;
 }
 function require_user(): array { return current_user() ?? throw new HttpError(401, t('login_required')); }
-function registration_open(): bool { return config()['registration'] && config()['allow_signups']; }
+function registration_open(): bool { return config()['allow_signups']; }
 function is_admin(?array $user=null): bool {
     $user??=current_user();if (!$user) return false;
     return config()['username'] ? in_array($user['username'],config()['username'],true) : ($user['user_id']??$user['id'])===(one('SELECT id FROM users ORDER BY id LIMIT 1')['id']??null);
