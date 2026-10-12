@@ -190,6 +190,15 @@ function register_account(string $name, string $password, string $confirm, bool 
     }
 }
 function section_list(int $blog): array { return query('SELECT * FROM sections WHERE blog_id=? ORDER BY sort_order,id',[$blog])->fetchAll(); }
+function navigation_sections(int $blog): array {
+    $order=one('SELECT home_order,feed_order FROM blogs WHERE id=?',[$blog]);
+    $sections=array_merge([
+        ['id'=>'home','slug'=>'','title'=>t('home'),'sort_order'=>$order['home_order']],
+        ['id'=>'blogs','slug'=>'blogs','title'=>t('blogs'),'sort_order'=>$order['feed_order']],
+    ],section_list($blog));
+    usort($sections,static fn($a,$b)=>$a['sort_order']<=>$b['sort_order']);
+    return $sections;
+}
 function slug_base(string $title): string {
     $title=strtr(mb_strtolower($title,'UTF-8'),['á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','ü'=>'u','ñ'=>'n']);
     $slug=trim(preg_replace('/[^a-z0-9]+/', '-', $title), '-');
@@ -218,7 +227,8 @@ function add_section(array $blog,string $title,string $content): int {
     return transaction(function () use ($blog,$title,$content) {
         if (count(section_list($blog['id']))>=10) fail(422,'section_limit');
         $time=now();
-        query('INSERT INTO sections(blog_id,title,slug,content_markdown,sort_order,created_at,updated_at) VALUES (?,?,?,?,?,?,?)',[$blog['id'],$title,free_section_slug($blog['id'],$title),$content, count(section_list($blog['id'])),$time,$time]);
+        $order=max(array_column(navigation_sections($blog['id']),'sort_order'))+1;
+        query('INSERT INTO sections(blog_id,title,slug,content_markdown,sort_order,created_at,updated_at) VALUES (?,?,?,?,?,?,?)',[$blog['id'],$title,free_section_slug($blog['id'],$title),$content,$order,$time,$time]);
         return (int)db()->lastInsertId();
     });
 }
@@ -227,13 +237,18 @@ function edit_section(array $blog,int $id,string $title,string $content): void {
     owned_section($blog,$id); $title=text_field($title,120); $content=markdown_field($content);
     query('UPDATE sections SET title=?,content_markdown=?,updated_at=? WHERE id=? AND blog_id=?',[$title,$content,now(),$id,$blog['id']]);
 }
-function reorder_section(array $blog,int $id,string $direction): void {
+function reorder_section(array $blog,int|string $id,string $direction): void {
     if (!in_array($direction,['up','down'],true)) fail(400,'invalid');
     transaction(function () use ($blog,$id,$direction) {
-        owned_section($blog,$id); $sections=section_list($blog['id']);
-        $index=array_search($id,array_column($sections,'id')); $other=$index+($direction==='up'?-1:1);
+        if (!in_array($id,['home','blogs'],true)) owned_section($blog,(int)$id);
+        $sections=navigation_sections($blog['id']);
+        $index=array_search($id,array_column($sections,'id'),true); $other=$index+($direction==='up'?-1:1);
         if (isset($sections[$other])) [$sections[$index],$sections[$other]]=[$sections[$other],$sections[$index]];
-        foreach ($sections as $order=>$section) query('UPDATE sections SET sort_order=?,updated_at=? WHERE id=? AND blog_id=?',[$order,now(),$section['id'],$blog['id']]);
+        foreach ($sections as $order=>$section) {
+            if ($section['id']==='home') query('UPDATE blogs SET home_order=?,updated_at=? WHERE id=?',[$order,now(),$blog['id']]);
+            elseif ($section['id']==='blogs') query('UPDATE blogs SET feed_order=?,updated_at=? WHERE id=?',[$order,now(),$blog['id']]);
+            else query('UPDATE sections SET sort_order=?,updated_at=? WHERE id=? AND blog_id=?',[$order,now(),$section['id'],$blog['id']]);
+        }
     });
 }
 function remember_path(int $blog,string $path,int $post): void {

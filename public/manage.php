@@ -51,6 +51,9 @@ function route_manage(string $path): void {
         }
         if (str_starts_with($path,'/manage/addons/')) { addon_route($blog,'manage',explode('/',substr($path,15)));return; }
         if ($path==='/manage/sections') { methods(['GET']);manage_sections($blog);return; }
+        if (preg_match('~\A/manage/sections/(home|blogs)/reorder\z~',$path,$m)) {
+            methods(['POST']);check_csrf();reorder_section($blog,$m[1],input('direction'));redirect('/manage/sections',303,'saved');
+        }
         if ($path==='/manage/sections/home') {
             methods(['GET','POST']);$error=submitted(function () use($blog) {save_home($blog,input('content'));redirect('/'.$blog['username'],303,'saved');});home_editor($blog,$error);return;
         }
