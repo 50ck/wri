@@ -53,8 +53,8 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
     headers_for($blog,$preview); $owner=is_owner($blog) && !$preview;
     echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e(($post['title'] ?? $section['title'] ?? $blog['title'])).'</title><link rel="stylesheet" href="/'.e($blog['username']).'/style.css"></head><body class="blog"><header class="blog-header"><h1 class="blog-title"><a href="/'.e($blog['username']).'">'.e($blog['title']).'</a></h1>';
     if ($blog['description']!=='') echo '<p class="blog-description">'.e($blog['description']).'</p>';
-    echo '<nav class="blog-nav" aria-label="'.e(t('sections')).'">'.link_to('/'.$blog['username'],'home').' '.link_to('/'.$blog['username'].'/blogs','blogs');
-    foreach (section_list($blog['id']) as $item) echo '<a href="/'.e($blog['username']).'/'.e($item['slug']).'">'.e($item['title']).'</a>';
+    echo '<nav class="blog-nav" aria-label="'.e(t('sections')).'">';
+    foreach (navigation_sections($blog['id']) as $item) echo '<a href="/'.e($blog['username']).($item['slug']!==''?'/'.e($item['slug']):'').'">'.e($item['title']).'</a> ';
     addon_slot('nav',$blog);
     echo '</nav></header>';
     echo '<main class="blog-main" id="main">';
@@ -115,14 +115,20 @@ function confirmation(string $key,string $help,string $cancel,?array $management
 }
 function manage_sections(array $blog): void {
     page('sections',function () use ($blog) {
-        $sections=section_list($blog['id']);echo '<ul class="section-list"><li>'.link_to('/'.$blog['username'],'home').' <span class="section-actions">'.link_to('/manage/sections/home','edit').'</span></li><li>'.link_to('/'.$blog['username'].'/blogs','blogs').'</li>';
+        $sections=navigation_sections($blog['id']);echo '<ul class="section-list">';
         foreach ($sections as $i=>$section) {
             $path='/manage/sections/'.$section['id'];
-            echo '<li><a href="/'.e($blog['username']).'/'.e($section['slug']).'">'.e($section['title']).'</a> <span class="section-actions">'.link_to($path.'/edit','edit').' '.link_to($path.'/delete','delete').'</span>';
+            echo '<li><a href="/'.e($blog['username']).($section['slug']!==''?'/'.e($section['slug']):'').'">'.e($section['title']).'</a>';
+            if ($section['id']==='home') echo ' <span class="section-actions">'.link_to('/manage/sections/home','edit').'</span>';
+            elseif ($section['id']!=='blogs') echo ' <span class="section-actions">'.link_to($path.'/edit','edit').' '.link_to($path.'/delete','delete').'</span>';
             echo ' <form class="inline" method="post" action="'.$path.'/reorder">';token_field();
-            if ($i>0) button('up','direction','up');if ($i<count($sections)-1) button('down','direction','down');echo '</form></li>';
-        } echo '</ul>';if (count($sections)<10) echo link_to('/manage/sections/new','new_section');
+            if ($i>0) reorder_button('up');if ($i<count($sections)-1) reorder_button('down');echo '</form></li>';
+        } echo '</ul>';if (count($sections)<12) echo link_to('/manage/sections/new','new_section');
     },null,$blog);
+}
+function reorder_button(string $direction): void {
+    $path=$direction==='up'?'M8 14V2M3 7l5-5 5 5':'M8 2v12M3 9l5 5 5-5';
+    echo '<button type="submit" name="direction" value="'.$direction.'" aria-label="'.e(t($direction)).'" title="'.e(t($direction)).'"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="'.$path.'"/></svg></button>';
 }
 function manage_appearance(array $blog,?string $error=null): void {
     page('appearance',function () use ($blog) {
