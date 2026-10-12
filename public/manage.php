@@ -151,7 +151,7 @@ function manage_addons(array $blog,?string $error=null): void {
 
 function manage_admin(array $blog,?string $error=null): void {
     page('admin',function () {
-        $platform=platform_settings();$home=$platform['homepage_blog_id'];
+        $platform=config();$home=$platform['homepage_blog_id'];
         echo '<ul class="section-list"><li>'.link_to('/manage/admin/signups?enabled='.($platform['allow_signups']?'0':'1'),$platform['allow_signups']?'close_signups':'allow_signups').'</li>';
         if ($home!==null) echo '<li>'.link_to('/manage/admin/homepage','use_platform_home').'</li>';
         echo '</ul>';

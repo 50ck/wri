@@ -52,16 +52,6 @@ function confirmation(string $key,string $help,string $cancel,?array $management
     page($key,function () use ($help,$cancel) {echo '<p>'.e(t($help)).'</p><form method="post">';token_field();echo '<div class="actions">'.link_to($cancel,'cancel');button('confirm');echo '</div></form>';},null,$management);
 }
 
-function config_fields(): array {
-    return [
-        'site'=>['name'=>'site_name','description'=>'site_description','base_url'=>'base_url','registration'=>'registration','debug'=>'debug'],
-        'admin'=>['user_id'=>'admin_user_id','initialized'=>'admin_initialized','allow_signups'=>'allow_signups','homepage_blog_id'=>'homepage_blog_id'],
-        'storage'=>['database'=>'database','sessions'=>'session_path'],
-        'limits'=>['request_bytes'=>'request_limit','markdown_bytes'=>'body_limit','css_bytes'=>'css_limit','posts_per_blog'=>'post_limit'],
-        'sessions'=>['lifetime_seconds'=>'session_lifetime'],
-        'passwords'=>['argon_memory_kib'=>'argon_memory','argon_time'=>'argon_time','bcrypt_cost'=>'bcrypt_cost'],
-    ];
-}
 function config(bool $reload=false): array {
     static $config;
     if ($reload) $config=null;
@@ -74,8 +64,8 @@ function config(bool $reload=false): array {
     if ($defaults===false || $settings===false) throw new RuntimeException('Invalid configuration file');
     $values=array_replace_recursive($defaults,$settings);
     $result=$values;
-    foreach (config_fields() as $section=>$fields) foreach ($fields as $name=>$key) {
-        $value=$values[$section][$name]??null;
+    foreach (['site','admin','storage','limits','sessions','passwords'] as $section) foreach ($defaults[$section] as $key=>$default) {
+        $value=$values[$section][$key]??null;
         if (!is_string($value)) throw new RuntimeException('Invalid configuration value');
         $override=getenv('BLOG_'.strtoupper($key));
         if ($override!==false) $value=$override;
@@ -109,13 +99,14 @@ function update_settings(callable $action): mixed {
     if (!$lock) throw new RuntimeException('Cannot lock configuration');
     try {
         if (!flock($lock,LOCK_EX)) throw new RuntimeException('Cannot lock configuration');
-        $settings=array_intersect_key(config(true),array_flip(array_values(config_fields()['admin'])));
+        $keys=['admin_user_id','admin_initialized','allow_signups','homepage_blog_id'];
+        $settings=array_intersect_key(config(true),array_flip($keys));
         $original=$settings;
         $source=file_get_contents(is_file($file)?$file:__DIR__.'/config.example.ini');
         if ($source===false) throw new RuntimeException('Cannot read configuration');
         $result=$action($settings);
         $changes=[];
-        foreach (config_fields()['admin'] as $name=>$key) {
+        foreach ($keys as $key) {
             $value=$settings[$key]??null;
             if (in_array($key,['admin_user_id','homepage_blog_id'],true)) {
                 if ($value!==null && (!is_int($value) || $value<1)) throw new RuntimeException('Invalid configured ID');
@@ -124,7 +115,7 @@ function update_settings(callable $action): mixed {
                 if (!is_bool($value)) throw new RuntimeException('Invalid configured flag');
                 $encoded=$value?'true':'false';
             }
-            if ($value!==$original[$key]) $changes[$name]=$encoded;
+            if ($value!==$original[$key]) $changes[$key]=$encoded;
         }
         if ($changes || !is_file($file)) {
             $lines=preg_split('/(?<=\n)/',$source);$out='';$section='';$seen=[];
@@ -252,9 +243,8 @@ function current_user(): ?array {
     return $user && (int)$user['auth_version']===(int)($_SESSION['auth_version']??0) ? $user : null;
 }
 function require_user(): array { return current_user() ?? throw new HttpError(401, t('login_required')); }
-function platform_settings(): array { return config(); }
-function registration_open(): bool { return config()['registration'] && (bool)platform_settings()['allow_signups']; }
-function is_admin(): bool { $user=current_user();return $user!==null && (int)$user['id']===(int)(platform_settings()['admin_user_id']??0); }
+function registration_open(): bool { return config()['registration'] && (bool)config()['allow_signups']; }
+function is_admin(): bool { $user=current_user();return $user!==null && (int)$user['id']===(int)(config()['admin_user_id']??0); }
 function require_admin(): void { require_user();if (!is_admin()) fail(403,'forbidden'); }
 function save_platform_home(string $id): void {
     require_admin();
@@ -290,7 +280,7 @@ function admin_delete_user(int $id): void {
     rate_limit('admin-delete',(string)$admin['id'],10,900);
     transaction(static function () use($id) {
         $user=admin_user($id);
-        if ($id===(int)platform_settings()['admin_user_id']) fail(403,'forbidden');
+        if ($id===(int)config()['admin_user_id']) fail(403,'forbidden');
         update_settings(static function (array &$settings) use($id,$user) {
             require_admin();if ($id===$settings['admin_user_id']) fail(403,'forbidden');
             query('DELETE FROM users WHERE id=?',[$id]);
@@ -469,7 +459,7 @@ function save_settings(array $blog,string $title,string $description,string $vis
 }
 function delete_account(array $blog,string $password,string $confirmation): void {
     transaction(function () use ($blog,$password,$confirmation) {
-        if ((int)$blog['user_id']===(int)platform_settings()['admin_user_id']) fail(403,'forbidden');
+        if ((int)$blog['user_id']===(int)config()['admin_user_id']) fail(403,'forbidden');
         $user=one('SELECT * FROM users WHERE id=?',[$blog['user_id']]);
         if (!$user || !password_check($password,$user['password_hash']) || !hash_equals($user['username'],$confirmation)) fail(422,'delete_error');
         update_settings(static function (array &$settings) use($user,$blog) {

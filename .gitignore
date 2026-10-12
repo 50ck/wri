@@ -13,3 +13,4 @@ __pycache__/
 
 /config.ini
 /config.ini.lock
+/.config.ini.sw?
