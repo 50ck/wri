@@ -513,6 +513,10 @@ function redirect(string $path,int $status=303,?string $flash=null): never {
     if ($flash) $_SESSION['flash']=$flash;
     send_header('Location: '.$path,true,$status);exit;
 }
+function request_query(): string {
+    $query=http_build_query($_GET,'','&',PHP_QUERY_RFC3986);
+    return $query!==''?'?'.$query:'';
+}
 function methods(array $allowed): void {
     if (!in_array($_SERVER['REQUEST_METHOD'],$allowed,true)) { send_header('Allow: '.implode(', ',$allowed));fail(405,'method_error'); }
 }
@@ -526,7 +530,7 @@ function submitted(callable $action): ?string {
 function route(): void {
     $path=explode('?',$_SERVER['REQUEST_URI']??'/',2)[0];
     if (strlen($path)>256 || !preg_match('~\A/[a-z0-9/._-]*\z~D',$path) || str_contains($path,'//') || str_contains($path,'..')) fail(404,'not_found');
-    if ($path!=='/' && str_ends_with($path,'/')) { methods(['GET']);redirect(rtrim($path,'/'),308); }
+    if ($path!=='/' && str_ends_with($path,'/')) { methods(['GET']);redirect(rtrim($path,'/').request_query(),308); }
     if ($path==='/_addons' || str_starts_with($path,'/_addons/')) { addon_route(null,'platform',array_slice(explode('/',trim($path,'/')),1)); }
     elseif ($path==='/admin.php' || str_starts_with($path,'/admin.php/')) { require_once __DIR__.'/public/admin.php';route_admin($path); }
     elseif ($path==='/manage' || str_starts_with($path,'/manage/')) { require_once __DIR__.'/public/manage.php';route_manage($path); }

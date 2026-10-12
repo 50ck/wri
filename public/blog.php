@@ -6,7 +6,7 @@ function route_blog(string $path): void {
     $blog=one('SELECT b.*,u.username FROM blogs b JOIN users u ON u.id=b.user_id WHERE u.username=?',[$name]);
     if (!$blog) {
         $alias=one('SELECT b.*,u.username FROM username_aliases a JOIN users u ON u.id=a.user_id JOIN blogs b ON b.user_id=u.id WHERE a.username=?',[$name]);
-        if ($alias) { can_read($alias);methods(['GET']);redirect('/'.$alias['username'].(count($parts)>1?'/'.implode('/',array_slice($parts,1)):''),308); }
+        if ($alias) { can_read($alias);methods(['GET']);redirect('/'.$alias['username'].(count($parts)>1?'/'.implode('/',array_slice($parts,1)):'').request_query(),308); }
     }
     if (!$blog) fail(404,'not_found');
     $tail=array_slice($parts,1);
@@ -51,7 +51,7 @@ function route_blog(string $path): void {
         $post=($section || $tail[0]==='posts') ? one('SELECT * FROM posts WHERE blog_id=? AND section_id IS ? AND slug=? AND deleted_at IS NULL',[$blog['id'],$section['id']??null,$tail[1]]) : null;
         if (!$post) {
             $old=one('SELECT p.* FROM redirects r JOIN posts p ON p.id=r.post_id WHERE r.blog_id=? AND r.old_path=? AND p.deleted_at IS NULL',[$blog['id'],implode('/',$tail)]);
-            if ($old) redirect(post_path($blog,$old),302);
+            if ($old) redirect(post_path($blog,$old),308);
             fail(404,'not_found');
         }
         render_blog($blog,$section,$post);return;
@@ -75,13 +75,20 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
     $number=$section && !$post?input('page',$_GET):'';
     if ($number!=='' && (!ctype_digit($number) || (int)$number<1 || (int)$number>10000)) fail(400,'invalid');
     $page=max(1,(int)$number);
+    $home=blog_home_path($blog);
+    $path=$post?post_path($blog,$post):($section?'/'.$blog['username'].'/'.$section['slug']:$home);
+    $posts=[];$more=false;
+    if ($section && !$post) {
+        $posts=query('SELECT * FROM posts WHERE blog_id=? AND section_id=? AND deleted_at IS NULL ORDER BY published_at DESC,id DESC LIMIT 21 OFFSET ?',[$blog['id'],$section['id'],($page-1)*20])->fetchAll();
+        if (!$posts && $page>1) fail(404,'not_found');
+        if ($number!=='' && ($page===1 || $number!==(string)$page)) redirect($path.($page>1?'?page='.$page:''),308);
+        $more=count($posts)>20;$posts=array_slice($posts,0,20);
+    }
     $body=$post ? $post['body_markdown'] : ($section ? $section['content_markdown'] : $blog['home_markdown']);
     $html=markdown($body,$blog);
     $title=$post || $section?($post['title']??$section['title']).' · '.$blog['title']:$blog['title'];
     if ($page>1) $title.=' · '.str_replace('{n}',(string)$page,t('page_number'));
     $description=$post || $section?blog_excerpt($html):$blog['description'];
-    $home=blog_home_path($blog);
-    $path=$post?post_path($blog,$post):($section?'/'.$blog['username'].'/'.$section['slug']:$home);
     $canonical=config()['base_url'].$path.($page>1?'?page='.$page:'');
     headers_for($blog,$preview); $owner=is_owner($blog) && !$preview;
     echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e($title).'</title>';
@@ -108,9 +115,6 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
             echo ' ';icon_link('/'.$blog['username'].'/new?section_id='.$section['id'],'new_post','plus');
         }
         echo '</h2>'.$html.'</section>';
-        $sql='SELECT * FROM posts WHERE blog_id=? AND section_id=? AND deleted_at IS NULL'; $params=[$blog['id'],$section['id']];
-        $sql.=' ORDER BY published_at DESC,id DESC LIMIT 21 OFFSET ?';$params[]=($page-1)*20;
-        $posts=query($sql,$params)->fetchAll();$more=count($posts)>20;$posts=array_slice($posts,0,20);
         if (!$posts) echo '<p>'.e(t('empty')).'</p>';
         else {
             echo '<ul class="blog-post-list">';
@@ -120,7 +124,7 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
             } echo '</ul>';
         }
         $base='/'.$blog['username'].'/'.$section['slug'];
-        echo '<nav aria-label="'.e(t('next')).'">';if ($page>1) echo link_to($base.'?page='.($page-1),'previous');if ($more) echo ' '.link_to($base.'?page='.($page+1),'next');echo '</nav>';
+        echo '<nav aria-label="'.e(t('next')).'">';if ($page>1) echo link_to($base.($page>2?'?page='.($page-1):''),'previous');if ($more) echo ' '.link_to($base.'?page='.($page+1),'next');echo '</nav>';
     }
     if ($owner && isset($_SESSION['flash'])) { echo '<p class="feedback" role="status">'.e(t($_SESSION['flash'])).'</p>'; unset($_SESSION['flash']); }
     echo '</main>';
