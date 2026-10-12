@@ -118,8 +118,8 @@ function t(string $key): string {
     if ($key==='brand') return config()['site_name'];
     if ($key==='intro') return config()['site_description'];
     static $strings;
-    $strings ??= parse_ini_file(__DIR__.'/strings.txt', false, INI_SCANNER_RAW);
-    if ($strings === false) throw new RuntimeException('Cannot read strings.txt');
+    $strings ??= parse_ini_file(__DIR__.'/strings.ini', false, INI_SCANNER_RAW);
+    if ($strings === false) throw new RuntimeException('Cannot read strings.ini');
     return $strings[$key] ?? throw new LogicException('Missing translation: '.$key);
 }
 
