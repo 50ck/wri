@@ -117,7 +117,8 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
     echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e($title).'</title>';
     if ($description!=='') echo '<meta name="description" content="'.e($description).'">';
     if (!$preview && $blog['visibility']==='public') echo '<link rel="canonical" href="'.e($canonical).'">';
-    echo '<link rel="stylesheet" href="/'.e($blog['username']).'/style.css"></head><body class="blog"><header class="blog-header"><h1 class="blog-title"><a href="'.e($home).'">'.e($blog['title']).'</a></h1>';
+    $brandTag=$post || $section?'p':'h1';
+    echo '<link rel="stylesheet" href="/'.e($blog['username']).'/style.css"></head><body class="blog"><header class="blog-header"><'.$brandTag.' class="blog-title"><a href="'.e($home).'">'.e($blog['title']).'</a></'.$brandTag.'>';
     if ($blog['description']!=='') echo '<p class="blog-description">'.e($blog['description']).'</p>';
     echo '<nav class="blog-nav" aria-label="'.e(t('sections')).'">';
     foreach (navigation_sections($blog['id']) as $item) echo '<a href="'.e($item['id']==='home'?$home:'/'.$blog['username'].'/'.$item['slug']).'">'.e($item['title']).'</a> ';
@@ -126,19 +127,19 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
     echo '</nav></header>';
     echo '<main class="blog-main" id="main">';
     if ($post) {
-        echo '<article class="blog-post"><h2 class="blog-post-title">'.e($post['title']).'</h2><p><time class="blog-post-date" datetime="'.e($post['published_at']).'">'.e(substr($post['published_at'],0,10)).'</time></p><div class="blog-post-body">'.$html.'</div></article>';
+        echo '<article class="blog-post" itemscope itemtype="https://schema.org/BlogPosting"><link itemprop="mainEntityOfPage" href="'.e($canonical).'"><link itemprop="url" href="'.e($canonical).'"><meta itemprop="dateModified" content="'.e($post['updated_at']).'"><h1 class="blog-post-title" itemprop="headline">'.e($post['title']).'</h1><p><time class="blog-post-date" itemprop="datePublished" datetime="'.e($post['published_at']).'">'.e(substr($post['published_at'],0,10)).'</time><span itemprop="author" itemscope itemtype="https://schema.org/Person"><a itemprop="url" href="'.e(config()['base_url'].$home).'"><span itemprop="name">'.e($blog['username']).'</span></a></span></p><div class="blog-post-body" itemprop="articleBody">'.$html.'</div></article>';
         addon_slot('post_after',$blog,$post);
         if ($owner) { echo '<div class="blog-owner">';icon_link('/'.$blog['username'].'/edit/'.$post['id'],'edit','pencil');icon_link('/'.$blog['username'].'/delete/'.$post['id'],'delete','trash');echo '</div>'; }
     } elseif (!$section) {
         echo '<article class="blog-section blog-home">';
         echo $html.'</article>';
     } else {
-        echo '<section class="blog-section"><h2>'.e($section['title']);
+        echo '<section class="blog-section"><h1>'.e($section['title']);
         if ($owner) {
             if ($section['id']!==null) { echo ' ';icon_link('/manage/sections/'.$section['id'].'/edit?from=section','edit','pencil'); }
             echo ' ';icon_link('/'.$blog['username'].'/new?section_id='.$section['id'],'new_post','plus');
         }
-        echo '</h2>'.$html.'</section>';
+        echo '</h1>'.$html.'</section>';
         if (!$posts) echo '<p>'.e(t('empty')).'</p>';
         else {
             echo '<ul class="blog-post-list">';
