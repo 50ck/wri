@@ -4,48 +4,6 @@ function route_manage(string $path): void {
     if ($path==='/manage' || str_starts_with($path,'/manage/')) {
         $blog=owned_blog();
         if ($path==='/manage') { methods(['GET']);redirect('/manage/settings'); }
-        if ($path==='/manage/admin/signups') {
-            require_admin();methods(['GET','POST']);$enabled=input('enabled',$_SERVER['REQUEST_METHOD']==='POST'?$_POST:$_GET);
-            if (!in_array($enabled,['0','1'],true)) fail(400,'invalid');
-            $error=submitted(function () use($enabled) {update_settings(static function (array &$settings) use($enabled) {require_admin();$settings['allow_signups']=$enabled==='1';});redirect('/manage/admin',303,'saved');});
-            page($enabled==='1'?'allow_signups':'close_signups',function () use($enabled) {
-                echo '<p>'.e(t('restore_help')).'</p><form method="post">';token_field();
-                echo '<input type="hidden" name="enabled" value="'.$enabled.'"><div class="actions">'.link_to('/manage/admin','cancel');button('confirm');echo '</div></form>';
-            },$error,$blog);return;
-        }
-        if ($path==='/manage/admin/users/new') {
-            require_admin();methods(['GET','POST']);
-            $error=submitted(function () {register_account(input('username'),input('new_password'),input('confirm_password'),true);redirect('/manage/admin',303,'saved');});
-            auth_form('register',$error,$blog);return;
-        }
-        if (preg_match('~\A/manage/admin/users/([1-9][0-9]*)/(edit|delete)\z~',$path,$m)) {
-            require_admin();methods(['GET','POST']);$user=admin_user((int)$m[1]);$self=$user['id']===$blog['user_id'];
-            if ($m[2]==='delete' && $self) fail(403,'forbidden');
-            if ($m[2]==='edit') {
-                $error=submitted(function () use($user,$self) {
-                    admin_edit_user($user['id'],input('username'),input('new_password'),input('confirm_password'),input('visibility'));
-                    if ($self && input('new_password')!=='') authenticate($user['id']);
-                    redirect('/manage/admin',303,'saved');
-                });admin_user_editor($blog,$user,$error);return;
-            }
-            $error=submitted(function () use($user) {
-                admin_delete_user($user['id']);
-                redirect('/manage/admin',303,'deleted');
-            });admin_user_delete($blog,$user,$error);return;
-        }
-        if ($path==='/manage/admin/homepage') {
-            require_admin();methods(['GET']);$id=input('blog_id',$_GET);
-            if ($id!=='' && (!ctype_digit($id) || !one("SELECT id FROM blogs WHERE id=? AND visibility='public'",[$id]))) fail(422,'invalid');
-            page('homepage',function () use($id) {
-                echo '<p>'.e(t('restore_help')).'</p><form method="post" action="/manage/admin">';token_field();
-                echo '<input type="hidden" name="blog_id" value="'.e($id).'"><div class="actions">'.link_to('/manage/admin','cancel');button('confirm');echo '</div></form>';
-            },null,$blog);return;
-        }
-        if ($path==='/manage/admin') {
-            require_admin();methods(['GET','POST']);
-            $error=submitted(function () {save_platform_home(input('blog_id'));redirect('/manage/admin',303,'saved');});
-            manage_admin($blog,$error);return;
-        }
         if ($path==='/manage/addons') {
             methods(['GET','POST']);$error=submitted(function () use($blog) {save_addons($blog,$_POST['addons']??[]);redirect('/manage/addons',303,'saved');});manage_addons($blog,$error);return;
         }
@@ -146,53 +104,5 @@ function manage_addons(array $blog,?string $error=null): void {
         echo '<form method="post" action="/manage/addons">';token_field();
         foreach ($installed as $id=>$addon) echo '<p><label><input type="checkbox" name="addons[]" value="'.e($id).'"'.(isset($active[$id])?' checked':'').'> '.e($addon['label']['en']).'</label></p>';
         echo '<div class="actions">';button('save');echo '</div></form>';
-    },$error,$blog);
-}
-
-function manage_admin(array $blog,?string $error=null): void {
-    page('admin',function () {
-        $platform=config();$home=$platform['homepage_blog_id'];
-        echo '<ul class="section-list"><li>'.link_to('/manage/admin/signups?enabled='.($platform['allow_signups']?'0':'1'),$platform['allow_signups']?'close_signups':'allow_signups').'</li>';
-        if ($home!==null) echo '<li>'.link_to('/manage/admin/homepage','use_platform_home').'</li>';
-        echo '</ul>';
-        echo '<h3>'.e(t('users')).'</h3>';
-        $number=input('page',$_GET);
-        if ($number!=='' && (!ctype_digit($number) || (int)$number<1 || (int)$number>10000)) fail(400,'invalid');
-        $page=max(1,(int)$number);
-        $users=query('SELECT u.id AS user_id,u.username,b.id,b.visibility FROM users u JOIN blogs b ON b.user_id=u.id ORDER BY u.id LIMIT 51 OFFSET ?',[($page-1)*50])->fetchAll();
-        $more=count($users)>50;echo '<p>'.link_to('/manage/admin/users/new','create_user').'</p><ul class="section-list">';
-        foreach (array_slice($users,0,50) as $user) {
-            echo '<li><a href="/'.e($user['username']).'">'.e($user['username']).'</a>';
-            echo ' <span class="section-actions">';
-            icon_link('/manage/admin/users/'.$user['user_id'].'/edit','edit','pencil');
-            if ((int)$user['user_id']!==(int)$platform['admin_user_id']) { echo ' ';icon_link('/manage/admin/users/'.$user['user_id'].'/delete','delete','trash'); }
-            if ($user['visibility']==='public' && (int)$user['id']!==(int)$home) {
-                echo ' '.link_to('/manage/admin/homepage?blog_id='.$user['id'],'use_blog_home');
-            } elseif ($user['visibility']==='private') echo ' '.e(t('private'));
-            echo '</span></li>';
-        }
-        echo '</ul><nav>';
-        if ($page>1) echo link_to('/manage/admin?page='.($page-1),'previous');
-        if ($more) echo link_to('/manage/admin?page='.($page+1),'next');
-        echo '</nav>';
-    },$error,$blog);
-}
-
-function admin_user_editor(array $blog,array $user,?string $error=null): void {
-    page('edit_user',function () use($user) {
-        echo '<form method="post">';token_field();
-        field('username','username',value('username',$user['username']),'text',true,24);
-        field('new_password','new_password','','password',false);
-        field('confirm_password','confirm_password','','password',false);
-        echo '<small>'.e(t('password_unchanged')).'</small><label for="visibility">'.e(t('visibility')).'</label><select name="visibility" id="visibility">';
-        foreach (['public','private'] as $state) echo '<option value="'.$state.'"'.(value('visibility',$user['visibility'])===$state?' selected':'').'>'.e(t($state)).'</option>';
-        echo '</select><div class="actions">';button('save');echo link_to('/manage/admin','cancel').'</div></form>';
-    },$error,$blog);
-}
-
-function admin_user_delete(array $blog,array $user,?string $error=null): void {
-    page('delete_user',function () use($user) {
-        echo '<form method="post">';token_field();
-        echo '<div class="actions">'.link_to('/manage/admin','cancel').'<button type="submit">'.e(str_replace('{username}',$user['username'],t('delete_user_button'))).'</button></div></form>';
     },$error,$blog);
 }

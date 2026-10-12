@@ -33,7 +33,11 @@ function page(string $key,callable $content,?string $error=null,?array $manageme
     foreach ($styles as $id) echo '<link rel="stylesheet" href="/_addons/'.e($id).'/style.css">';
     echo '</head><body>';
     if ($management) {
-        echo '<header><h1 class="manage-title">'.e(t('manage')).'</h1><nav aria-label="'.e(t('manage')).'">'.link_to('/manage/settings','settings').' '.link_to('/manage/sections','sections').' '.link_to('/manage/appearance','appearance').' '.link_to('/manage/addons','addons').(is_admin()?' '.link_to('/manage/admin','admin'):'').'</nav><div class="actions">'.link_to('/'.$management['username'],'blog').'<form class="inline" method="post" action="/logout">';token_field();button('logout');echo '</form></div></header>';
+        $admin=str_starts_with($_SERVER['REQUEST_URI']??'','/admin.php');$title=$admin?'admin':'manage';
+        echo '<header><h1 class="manage-title">'.e(t($title)).'</h1><nav aria-label="'.e(t($title)).'">';
+        if ($admin) echo link_to('/admin.php/config','config').' '.link_to('/admin.php/users','users').' '.link_to('/manage','manage');
+        else echo link_to('/manage/settings','settings').' '.link_to('/manage/sections','sections').' '.link_to('/manage/appearance','appearance').' '.link_to('/manage/addons','addons').(is_admin()?' '.link_to('/admin.php','admin'):'');
+        echo '</nav><div class="actions">'.link_to('/'.$management['username'],'blog').'<form class="inline" method="post" action="/logout">';token_field();button('logout');echo '</form></div></header>';
     }
     echo '<main id="main">'.($management?'<h2>':'<h1>').e(t($key)).($management?'</h2>':'</h1>');
     if ($error) echo '<p class="error" role="alert">'.e($error).'</p>';
@@ -71,6 +75,7 @@ function config(bool $reload=false): array {
         if ($override!==false) $value=$override;
         $result[$key]=$value;
     }
+    foreach (['site_name','site_description'] as $key) $result[$key]=strtr($result[$key],['\\"'=>'"','\\\\'=>'\\']);
     foreach (['registration','debug','admin_initialized','allow_signups'] as $key) {
         $result[$key]=filter_var($result[$key],FILTER_VALIDATE_BOOLEAN,FILTER_NULL_ON_FAILURE);
         if ($result[$key]===null) throw new RuntimeException('Invalid configured flag');
@@ -94,12 +99,13 @@ function config(bool $reload=false): array {
     $result['config_file']=$file;
     return $config=$result;
 }
-function update_settings(callable $action): mixed {
+function update_settings(callable $action,string $group='admin'): mixed {
+    if (!in_array($group,['admin','site'],true)) throw new RuntimeException('Invalid configuration group');
     $file=config()['config_file'];$lock=fopen($file.'.lock','c');$temp=null;
     if (!$lock) throw new RuntimeException('Cannot lock configuration');
     try {
         if (!flock($lock,LOCK_EX)) throw new RuntimeException('Cannot lock configuration');
-        $keys=['admin_user_id','admin_initialized','allow_signups','homepage_blog_id'];
+        $keys=$group==='admin'?['admin_user_id','admin_initialized','allow_signups','homepage_blog_id']:['site_name','site_description'];
         $settings=array_intersect_key(config(true),array_flip($keys));
         $original=$settings;
         $source=file_get_contents(is_file($file)?$file:__DIR__.'/config.example.ini');
@@ -108,7 +114,10 @@ function update_settings(callable $action): mixed {
         $changes=[];
         foreach ($keys as $key) {
             $value=$settings[$key]??null;
-            if (in_array($key,['admin_user_id','homepage_blog_id'],true)) {
+            if ($group==='site') {
+                if (!is_string($value) || !mb_check_encoding($value,'UTF-8') || strpbrk($value,"\r\n\0")!==false || mb_strlen($value,'UTF-8')>($key==='site_name'?120:280) || ($key==='site_name' && trim($value)==='')) fail(422,'text_error');
+                $encoded='"'.str_replace(['\\','"'],['\\\\','\\"'],$value).'"';
+            } elseif (in_array($key,['admin_user_id','homepage_blog_id'],true)) {
                 if ($value!==null && (!is_int($value) || $value<1)) throw new RuntimeException('Invalid configured ID');
                 $encoded=$value===null?'""':(string)$value;
             } else {
@@ -121,22 +130,21 @@ function update_settings(callable $action): mixed {
             $lines=preg_split('/(?<=\n)/',$source);$out='';$section='';$seen=[];
             foreach ($lines as $line) {
                 if (preg_match('/^\h*\[([^\]\r\n]+)\]\h*(?:;[^\r\n]*)?(?:\r?\n)?$/',$line,$match)) {
-                    if ($section==='admin' && $changes) { $out.=implode('',array_map(static fn($key,$value)=>$key.' = '.$value."\n",array_keys($changes),$changes));$changes=[]; }
+                    if ($section===$group && $changes) { $out.=implode('',array_map(static fn($key,$value)=>$key.' = '.$value."\n",array_keys($changes),$changes));$changes=[]; }
                     $section=$match[1];
                 }
-                if ($section==='admin' && preg_match('/^(\h*([a-z_]+)\h*=\h*)([^;\r\n]*)(;[^\r\n]*)?(\r?\n)?$/',$line,$match)) {
+                if ($section===$group && preg_match('/^(\h*([a-z_]+)\h*=\h*)("(?:\\\\.|[^"\\\\])*"|[^;\r\n]*?)(\h*(?:;[^\r\n]*)?)(\r?\n)?$/',$line,$match)) {
                     $name=$match[2];
-                    if (isset($seen[$name])) throw new RuntimeException('Duplicate admin configuration key');
+                    if (isset($seen[$name])) throw new RuntimeException('Duplicate configuration key');
                     $seen[$name]=true;
                     if (isset($changes[$name])) {
-                        preg_match('/\h*$/',$match[3],$space);
-                        $line=$match[1].$changes[$name].$space[0].($match[4]??'').($match[5]??'');
+                        $line=$match[1].$changes[$name].($match[4]??'').($match[5]??'');
                         unset($changes[$name]);
                     }
                 }
                 $out.=$line;
             }
-            if ($changes) $out.="\n".($section==='admin'?'':"[admin]\n").implode('',array_map(static fn($key,$value)=>$key.' = '.$value."\n",array_keys($changes),$changes));
+            if ($changes) $out.="\n".($section===$group?'':"[$group]\n").implode('',array_map(static fn($key,$value)=>$key.' = '.$value."\n",array_keys($changes),$changes));
             $temp=tempnam(dirname($file),'.config-');
             if ($temp===false || dirname($temp)!==dirname($file)) throw new RuntimeException('Cannot prepare configuration');
             if (file_put_contents($temp,$out)!==strlen($out) || !chmod($temp,0600) || !rename($temp,$file)) throw new RuntimeException('Cannot save configuration');
@@ -148,7 +156,7 @@ function update_settings(callable $action): mixed {
     }
 }
 function reserved_names(): array {
-    return ['admin','administrator','api','login','logout','register','signup','manage','assets','static','style','style.css','health','robots.txt','posts','new','edit','delete','preview','_addons','blog.php','manage.php','favicon.ico','index.php','www','root','support','security','abuse','postmaster','webmaster','bin','src','config','storage','database','vendor','libraries','tests','.well-known'];
+    return ['admin','administrator','api','login','logout','register','signup','manage','assets','static','style','style.css','health','robots.txt','posts','new','edit','delete','preview','_addons','blog.php','manage.php','admin.php','favicon.ico','index.php','www','root','support','security','abuse','postmaster','webmaster','bin','src','config','storage','database','vendor','libraries','tests','.well-known'];
 }
 
 function section_reserved_names(): array { return array_merge(reserved_names(), ['inicio','blogs']); }
@@ -495,6 +503,7 @@ function route(): void {
     if (strlen($path)>256 || !preg_match('~\A/[a-z0-9/._-]*\z~D',$path) || str_contains($path,'//') || str_contains($path,'..')) fail(404,'not_found');
     if ($path!=='/' && str_ends_with($path,'/')) { methods(['GET']);redirect(rtrim($path,'/'),308); }
     if ($path==='/_addons' || str_starts_with($path,'/_addons/')) { addon_route(null,'platform',array_slice(explode('/',trim($path,'/')),1)); }
+    elseif ($path==='/admin.php' || str_starts_with($path,'/admin.php/')) { require_once __DIR__.'/public/admin.php';route_admin($path); }
     elseif ($path==='/manage' || str_starts_with($path,'/manage/')) { require_once __DIR__.'/public/manage.php';route_manage($path); }
     elseif (in_array($path,['/','/register','/signup','/login','/logout'],true)) route_index($path);
     else { require_once __DIR__.'/public/blog.php';route_blog($path); }
