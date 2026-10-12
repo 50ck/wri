@@ -36,6 +36,7 @@ function route_blog(string $path): void {
     can_read($blog);
     if (($tail[0]??'')==='_addons') { addon_route($blog,'public',array_slice($tail,1));return; }
     methods(['GET']);
+    if ($tail===['sitemap.xml']) { blog_sitemap($blog);return; }
     if (!$tail) { render_blog($blog);return; }
     if ($tail===['inicio']) redirect('/'.$blog['username'],308);
     if ($tail===['style.css']) {
@@ -61,6 +62,24 @@ function route_blog(string $path): void {
         render_blog($blog,$section,$post);return;
     }
     fail(404,'not_found');
+}
+
+function blog_sitemap(array $blog): void {
+    if ($blog['visibility']!=='public') fail(404,'not_found');
+    $part=sitemap_part();$count=(int)query('SELECT count(*) FROM posts WHERE blog_id=? AND deleted_at IS NULL',[$blog['id']])->fetchColumn();
+    $parts=max(1,(int)ceil($count/10000));
+    if ($part>$parts) fail(404,'not_found');
+    if ($parts>1 && !isset($_GET['part'])) {
+        sitemap_xml((static function () use($blog,$parts) {for ($i=1;$i<=$parts;$i++) yield ['/'.$blog['username'].'/sitemap.xml?part='.$i,null];})(),true);return;
+    }
+    sitemap_xml((static function () use($blog,$part) {
+        if ($part===1) {
+            if (blog_home_path($blog)!=='/') yield [blog_home_path($blog),$blog['updated_at']];
+            foreach (section_list($blog['id']) as $section) yield ['/'.$blog['username'].'/'.$section['slug'],null];
+            if (has_unsectioned_posts($blog['id'])) yield ['/'.$blog['username'].'/posts',null];
+        }
+        foreach (query('SELECT p.slug,p.updated_at,s.slug AS section_slug FROM posts p LEFT JOIN sections s ON s.id=p.section_id AND s.blog_id=p.blog_id WHERE p.blog_id=? AND p.deleted_at IS NULL ORDER BY p.id LIMIT 10000 OFFSET ?',[$blog['id'],($part-1)*10000]) as $post) yield ['/'.$blog['username'].'/'.($post['section_slug']??'posts').'/'.$post['slug'],$post['updated_at']];
+    })());
 }
 
 function blog_excerpt(string $html): string {

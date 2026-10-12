@@ -160,7 +160,7 @@ function update_settings(callable $action): mixed {
     }
 }
 function reserved_names(): array {
-    return ['admin','administrator','api','login','logout','register','signup','manage','assets','static','style','style.css','health','robots.txt','posts','new','edit','delete','preview','_addons','blog.php','manage.php','admin.php','favicon.ico','index.php','www','root','support','security','abuse','postmaster','webmaster','bin','src','config','storage','database','vendor','libraries','tests','.well-known'];
+    return ['admin','administrator','api','login','logout','register','signup','manage','assets','static','style','style.css','health','robots.txt','sitemap.xml','posts','new','edit','delete','preview','_addons','blog.php','manage.php','admin.php','favicon.ico','index.php','www','root','support','security','abuse','postmaster','webmaster','bin','src','config','storage','database','vendor','libraries','tests','.well-known'];
 }
 
 function section_reserved_names(): array { return array_merge(reserved_names(), ['inicio']); }
@@ -518,6 +518,22 @@ function request_query(): string {
     $query=http_build_query($_GET,'','&',PHP_QUERY_RFC3986);
     return $query!==''?'?'.$query:'';
 }
+function sitemap_part(): int {
+    $value=input('part',$_GET);
+    if ($value!=='' && (!ctype_digit($value) || (int)$value<1 || (int)$value>1000000)) fail(400,'invalid');
+    return max(1,(int)$value);
+}
+function sitemap_xml(iterable $entries,bool $index=false): void {
+    headers_for();send_header('Content-Type: application/xml; charset=utf-8');
+    $root=$index?'sitemapindex':'urlset';$tag=$index?'sitemap':'url';$count=0;$bytes=0;
+    echo '<?xml version="1.0" encoding="UTF-8"?><'.$root.' xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
+    foreach ($entries as [$path,$modified]) {
+        $xml='<'.$tag.'><loc>'.e(config()['base_url'].$path).'</loc>'.($modified?'<lastmod>'.e($modified).'</lastmod>':'').'</'.$tag.'>';
+        if (++$count>50000 || ($bytes+=strlen($xml))>50000000) fail(503,'server_error');
+        echo $xml;
+    }
+    echo '</'.$root.'>';
+}
 function methods(array $allowed): void {
     if (!in_array($_SERVER['REQUEST_METHOD'],$allowed,true)) { send_header('Allow: '.implode(', ',$allowed));fail(405,'method_error'); }
 }
@@ -535,7 +551,7 @@ function route(): void {
     if ($path==='/_addons' || str_starts_with($path,'/_addons/')) { addon_route(null,'platform',array_slice(explode('/',trim($path,'/')),1)); }
     elseif ($path==='/admin.php' || str_starts_with($path,'/admin.php/')) { require_once __DIR__.'/public/admin.php';route_admin($path); }
     elseif ($path==='/manage' || str_starts_with($path,'/manage/')) { require_once __DIR__.'/public/manage.php';route_manage($path); }
-    elseif (in_array($path,['/','/register','/signup','/login','/logout'],true)) route_index($path);
+    elseif (in_array($path,['/','/register','/signup','/login','/logout','/robots.txt','/sitemap.xml'],true)) route_index($path);
     else { require_once __DIR__.'/public/blog.php';route_blog($path); }
 }
 function run(): void {

@@ -2,13 +2,32 @@
 declare(strict_types=1);
 require dirname(__DIR__).'/app.php';
 function route_index(string $path): void {
+    if ($path==='/robots.txt') {
+        methods(['GET']);headers_for();send_header('Content-Type: text/plain; charset=utf-8');
+        echo "User-agent: *\nAllow: /\n";
+        $count=0;foreach (platform_sitemaps() as $entry) $count++;
+        for ($part=1;$part<=max(1,(int)ceil($count/50000));$part++) echo 'Sitemap: '.config()['base_url'].'/sitemap.xml'.($part>1?'?part='.$part:'')."\n";
+        return;
+    }
+    if ($path==='/sitemap.xml') {
+        methods(['GET']);$part=sitemap_part();
+        if (input('home',$_GET)==='1') {
+            $blog=platform_home_blog();if ($blog && $blog['visibility']!=='public') fail(404,'not_found');
+            sitemap_xml([['/',null]]);return;
+        }
+        sitemap_xml((static function () use($part) {
+            $start=($part-1)*50000;$found=false;
+            foreach (platform_sitemaps() as $i=>$entry) {
+                if ($i<$start) continue;if ($i>=$start+50000) break;
+                $found=true;yield $entry;
+            }
+            if (!$found && $part>1) fail(404,'not_found');
+        })(),true);return;
+    }
     if ($path==='/') {
         methods(['GET']);
-        $home=config()['homepage'];
-        if ($home!=='') {
-            $blog=one('SELECT b.*,u.username FROM blogs b JOIN users u ON u.id=b.user_id WHERE u.username=?',[$home]);
-            if ($blog) { require_once __DIR__.'/blog.php';can_read($blog);render_blog($blog);return; }
-        }
+        $blog=platform_home_blog();
+        if ($blog) { require_once __DIR__.'/blog.php';can_read($blog);render_blog($blog);return; }
         page('brand',function () {
             echo '<p>'.e(t('intro')).'</p>';
             echo '<p>'.link_to('/login','login');
@@ -39,6 +58,17 @@ function route_index(string $path): void {
     }
     if ($path==='/logout') { methods(['POST']);check_csrf();logout();redirect('/'); }
     fail(404,'not_found');
+}
+function platform_home_blog(): ?array {
+    return config()['homepage']!==''?one('SELECT b.*,u.username FROM blogs b JOIN users u ON u.id=b.user_id WHERE u.username=?',[config()['homepage']]):null;
+}
+function platform_sitemaps(): Generator {
+    $home=platform_home_blog();
+    if (!$home || $home['visibility']==='public') yield ['/sitemap.xml?home=1',null];
+    foreach (query("SELECT u.username,count(p.id) AS posts FROM blogs b JOIN users u ON u.id=b.user_id LEFT JOIN posts p ON p.blog_id=b.id AND p.deleted_at IS NULL WHERE b.visibility='public' GROUP BY b.id ORDER BY b.id") as $blog) {
+        $parts=max(1,(int)ceil($blog['posts']/10000));
+        for ($part=1;$part<=$parts;$part++) yield ['/'.$blog['username'].'/sitemap.xml'.($parts>1?'?part='.$part:''),null];
+    }
 }
 function auth_form(string $kind,?string $error=null,?array $management=null): void {
     $action=$management?'/admin.php/users/new':'/'.$kind;
