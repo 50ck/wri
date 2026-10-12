@@ -3,6 +3,7 @@
 /bin/
 /config/
 /tests/
+/AGENTS.md
 *.log
 
 __pycache__/
