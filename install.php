@@ -95,5 +95,5 @@ try {
     chmod(dirname(BLOG_DATABASE), 0700);
     chmod(BLOG_SESSION_PATH, 0700);
     initialize_database(); chmod(BLOG_DATABASE, 0600);
-    echo "Database ready. Configure Nginx and PHP-FPM; see README.md.\n";
+    echo "ok\n";
 } catch (Throwable $e) { fwrite(STDERR, $e->getMessage() . "\n"); exit(1); }
