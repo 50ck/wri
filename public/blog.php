@@ -39,7 +39,7 @@ function route_blog(string $path): void {
     if ($tail===['sitemap.xml']) { blog_sitemap($blog);return; }
     if (!$tail) { render_blog($blog);return; }
     if ($tail===['style.css']) {
-        headers_for($blog);send_header('Content-Type: text/css; charset=utf-8');echo addon_styles($blog).($blog['custom_css'] ?: file_get_contents(__DIR__.'/assets/blog.css'));return;
+        headers_for($blog);send_header('Content-Type: text/css; charset=utf-8');echo file_get_contents(__DIR__.'/assets/blog.css')."\n".addon_styles($blog)."\n".$blog['custom_css'];return;
     }
     if ($tail===['preview']) { if (!is_owner($blog)) fail(403,'forbidden');render_blog($blog,null,null,true);return; }
     if ($tail===['posts']) {
