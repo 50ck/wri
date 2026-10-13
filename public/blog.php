@@ -121,11 +121,15 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
     if (!$preview && $blog['visibility']==='public') echo '<link rel="canonical" href="'.e($canonical).'">';
     echo '<link rel="stylesheet" href="/'.e($blog['username']).'/style.css"></head><body class="blog"><header class="blog-header"><p class="blog-title"><a href="'.e($home).'">'.e($blog['title']).'</a></p>';
     if ($blog['description']!=='') echo '<p class="blog-description">'.e($blog['description']).'</p>';
-    echo '<nav class="blog-nav" aria-label="'.e(t('sections')).'">';
-    foreach (section_list($blog['id']) as $item) echo '<a href="'.e(section_path($blog,$item)).'">'.e($item['title']).'</a> ';
-    if (has_unsectioned_posts($blog['id'])) echo link_to(section_path($blog,['id'=>null,'slug'=>'posts']),'posts').' ';
-    addon_slot('nav',$blog);
-    echo '</nav></header>';
+    $sections=section_list($blog['id']);$unsectioned=has_unsectioned_posts($blog['id']);
+    ob_start();addon_slot('nav',$blog);$addonNav=ob_get_clean();
+    if (count($sections)+(int)$unsectioned>1 || trim($addonNav)!=='') {
+        echo '<nav class="blog-nav" aria-label="'.e(t('sections')).'">';
+        foreach ($sections as $item) echo '<a href="'.e(section_path($blog,$item)).'">'.e($item['title']).'</a> ';
+        if ($unsectioned) echo link_to(section_path($blog,['id'=>null,'slug'=>'posts']),'posts').' ';
+        echo $addonNav.'</nav>';
+    }
+    echo '</header>';
     echo '<main class="blog-main" id="main">';
     if ($post) {
         echo '<article class="blog-post" itemscope itemtype="https://schema.org/BlogPosting"><link itemprop="mainEntityOfPage" href="'.e($canonical).'"><link itemprop="url" href="'.e($canonical).'"><meta itemprop="dateModified" content="'.e($post['updated_at']).'"><h1 class="blog-post-title" itemprop="headline">'.e($post['title']).'</h1><p><time class="blog-post-date" itemprop="datePublished" datetime="'.e($post['published_at']).'">'.e(substr($post['published_at'],0,10)).'</time><span itemprop="author" itemscope itemtype="https://schema.org/Person"><a itemprop="url" href="'.e(config()['base_url'].$home).'"><span itemprop="name">'.e($blog['username']).'</span></a></span></p><div class="blog-post-body" itemprop="articleBody">'.$html.'</div></article>';
