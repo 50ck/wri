@@ -98,7 +98,7 @@ function admin_users(array $blog,?string $error=null): void {
         $users=query('SELECT u.id AS user_id,u.username,b.id,b.visibility FROM users u JOIN blogs b ON b.user_id=u.id ORDER BY u.id LIMIT 51 OFFSET ?',[($page-1)*50])->fetchAll();
         $more=count($users)>50;echo '<p>'.link_to('/admin.php/users/new','create_user').'</p><ul class="section-list">';
         foreach (array_slice($users,0,50) as $user) {
-            echo '<li><a href="/'.e($user['username']).'">'.e($user['username']).'</a>';
+            echo '<li><a href="'.e(blog_home_path($user)).'">'.e($user['username']).'</a>';
             echo ' <span class="section-actions">';
             icon_link('/admin.php/users/'.$user['user_id'].'/edit','edit','pencil');
             if (!is_admin($user)) { echo ' ';icon_link('/admin.php/users/'.$user['user_id'].'/delete','delete','trash'); }

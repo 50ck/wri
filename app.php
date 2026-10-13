@@ -43,7 +43,7 @@ function page(string $key,callable $content,?string $error=null,?array $manageme
         if ($admin) echo link_to('/admin.php/config','config').' '.link_to('/admin.php/users','users').' '.link_to('/manage','manage');
         else echo link_to('/manage/settings','settings').' '.link_to('/manage/sections','sections').' '.link_to('/manage/appearance','appearance').' '.link_to('/manage/addons','addons').(is_admin()?' '.link_to('/admin.php','admin'):'');
         echo '</nav>';
-        if (!$admin) { echo '<div class="actions">'.link_to('/'.$management['username'],'blog').'<form class="inline" method="post" action="/logout">';token_field();button('logout');echo '</form></div>'; }
+        if (!$admin) { echo '<div class="actions">'.link_to(blog_home_path($management),'blog').'<form class="inline" method="post" action="/logout">';token_field();button('logout');echo '</form></div>'; }
         echo '</header>';
     }
     echo '<main id="main">'.($management?'<h2>':'<h1>').e(t($key)).($management?'</h2>':'</h1>');
@@ -342,12 +342,12 @@ function can_read(array $blog): void { if ($blog['visibility'] === 'private' && 
 function headers_for(?array $blog = null, bool $preview = false, array $addonStyles = []): void {
     send_header('Cache-Control: no-store, private'); send_header('X-Content-Type-Options: nosniff'); send_header('Referrer-Policy: no-referrer');
     $path=explode('?',$_SERVER['REQUEST_URI']??'/',2)[0];
-    $operational=preg_match('~\A(?:/(?:manage|admin\.php|login|register|signup|logout)(?:/|$)|/[^/]+/(?:new|edit|delete|preview)(?:/|$))~',$path);
+    $operational=preg_match('~\A(?:/(?:manage|admin\.php|login|register|signup|logout|new|edit|delete|preview)(?:/|$)|/[^/]+/(?:new|edit|delete|preview)(?:/|$))~',$path);
     if ($operational || $preview || ($blog && $blog['visibility']==='private') || (http_response_code()?:200)>=400) send_header('X-Robots-Tag: noindex');
     $origin=config()['base_url'];
     $styles = $origin . '/assets/base.css';
     foreach ($addonStyles as $id) if (isset(addons('admin')[$id]['style'])) $styles.=' '.$origin.'/_addons/'.$id.'/style.css';
-    if ($blog) $styles .= ' ' . $origin . '/assets/blog.css ' . $origin . '/' . $blog['username'] . '/style.css';
+    if ($blog) $styles .= ' ' . $origin . '/assets/blog.css ' . $origin . blog_prefix($blog) . '/style.css';
     $imagePolicy=$blog ? 'https:' : "'none'";
     $csp="default-src 'none'; script-src 'none'; style-src $styles; img-src $imagePolicy; font-src 'none'; connect-src 'none'; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors " . ($preview ? "'self'" : "'none'");
     if (!$blog) $csp .= "; frame-src $origin";
@@ -387,7 +387,7 @@ function section_list(int $blog): array { return query('SELECT * FROM sections W
 function home_section(array $blog): ?array { return one('SELECT * FROM sections WHERE blog_id=? ORDER BY (id=?) DESC,sort_order,id LIMIT 1',[$blog['id'],$blog['home_section_id']]); }
 function section_path(array $blog,array $section): string {
     $home=$blog['home_section_id']??(home_section($blog)['id']??null);
-    return $section['id']===$home?blog_home_path($blog):'/'.$blog['username'].'/'.$section['slug'];
+    return $section['id']===$home?blog_home_path($blog):blog_prefix($blog).'/'.$section['slug'];
 }
 function slug_base(string $title): string {
     $title=strtr(mb_strtolower($title,'UTF-8'),['á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','ü'=>'u','ñ'=>'n']);
@@ -485,7 +485,15 @@ function delete_post(array $blog,int $id): void {
     owned_post($blog,$id);
     query('UPDATE posts SET deleted_at=?,updated_at=? WHERE id=? AND blog_id=?',[now(),now(),$id,$blog['id']]);
 }
-function post_path(array $blog,array $post): string { return '/'.$blog['username'].'/'.namespace_path($post['section_id'],$post['slug']); }
+function blog_prefix(array $blog): string {
+    static $multiple;
+    if (config()['homepage']===$blog['username']) {
+        $multiple??=(bool)one('SELECT id FROM blogs LIMIT 1 OFFSET 1');
+        if (!$multiple) return '';
+    }
+    return '/'.$blog['username'];
+}
+function post_path(array $blog,array $post): string { return blog_prefix($blog).'/'.namespace_path($post['section_id'],$post['slug']); }
 function blog_home_path(array $blog): string { return config()['homepage']===$blog['username']?'/':'/'.$blog['username']; }
 function save_css(array $blog,string $css): void {
     if (strlen($css)>config()['css_limit']) fail(413,'too_large');
@@ -548,7 +556,11 @@ function route(): void {
     $path=explode('?',$_SERVER['REQUEST_URI']??'/',2)[0];
     if (strlen($path)>256 || !preg_match('~\A/[a-z0-9/._-]*\z~D',$path) || str_contains($path,'//') || str_contains($path,'..')) fail(404,'not_found');
     if ($path!=='/' && str_ends_with($path,'/')) { methods(['GET']);redirect(rtrim($path,'/').request_query(),308); }
-    if ($path==='/_addons' || str_starts_with($path,'/_addons/')) { addon_route(null,'platform',array_slice(explode('/',trim($path,'/')),1)); }
+    if ($path==='/_addons' || str_starts_with($path,'/_addons/')) {
+        $tail=array_slice(explode('/',trim($path,'/')),1);$addon=addons('admin')[$tail[0]??'']??null;
+        if ($addon && (isset($addon['routes']['platform']) || array_slice($tail,1)===['style.css'])) addon_route(null,'platform',$tail);
+        else { require_once __DIR__.'/public/blog.php';route_blog($path); }
+    }
     elseif ($path==='/admin.php' || str_starts_with($path,'/admin.php/')) { require_once __DIR__.'/public/admin.php';route_admin($path); }
     elseif ($path==='/manage' || str_starts_with($path,'/manage/')) { require_once __DIR__.'/public/manage.php';route_manage($path); }
     elseif (in_array($path,['/','/register','/signup','/login','/logout','/robots.txt','/sitemap.xml'],true)) route_index($path);

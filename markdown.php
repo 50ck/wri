@@ -10,7 +10,10 @@ function markdown_own_link(string $href,?array $blog): bool {
         if (isset($url['user']) || ($url['port']??(strtolower($url['scheme'])==='https'?443:80))!==($origin['port']??($origin['scheme']==='https'?443:80))) return false;
     }
     $path=$url['path']??(isset($url['host'])?'/':'');$home='/'.$blog['username'];
-    return !preg_match('~(?:^|/)(?:\.|\.\.)(?:/|$)~',$path) && ($path===$home || str_starts_with($path,$home.'/') || ($path==='/' && config()['homepage']===$blog['username']));
+    if (preg_match('~(?:^|/)(?:\.|\.\.)(?:/|$)~',$path)) return false;
+    if ($path===$home || str_starts_with($path,$home.'/') || ($path==='/' && config()['homepage']===$blog['username'])) return true;
+    $first=explode('/',ltrim($path,'/'))[0];
+    return str_starts_with($path,'/') && blog_prefix($blog)==='' && ($first==='posts' || (bool)one('SELECT id FROM sections WHERE blog_id=? AND slug=?',[$blog['id'],$first]));
 }
 function markdown_image_url(string $url): ?string {
     if (strlen($url)>512 || preg_match('/[\x00-\x20\x7f\\\\;<>"\']/', $url) || !filter_var($url,FILTER_VALIDATE_URL)) return null;

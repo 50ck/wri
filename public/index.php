@@ -15,6 +15,8 @@ function route_index(string $path): void {
             $blog=platform_home_blog();if ($blog && $blog['visibility']!=='public') fail(404,'not_found');
             sitemap_xml([['/',null]]);return;
         }
+        $blog=platform_home_blog();
+        if ($blog && blog_prefix($blog)==='') { require_once __DIR__.'/blog.php';can_read($blog);blog_sitemap($blog);return; }
         sitemap_xml((static function () use($part) {
             $start=($part-1)*50000;$found=false;
             foreach (platform_sitemaps() as $i=>$entry) {
@@ -40,7 +42,7 @@ function route_index(string $path): void {
         $error=submitted(function () {
             rate_limit('registration',$_SERVER['REMOTE_ADDR']??'',5,3600);
             $user=register_account(input('username'),input('new_password'),input('confirm_password'));
-            authenticate($user['id']);redirect('/'.$user['username']);
+            authenticate($user['id']);redirect(blog_home_path(owned_blog()));
         });auth_form('register',$error);return;
     }
     if ($path==='/login') {
@@ -53,7 +55,7 @@ function route_index(string $path): void {
             $dummy='$2y$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi.';
             $valid=password_check(input('password'),$user['password_hash']??$dummy);
             if (!$user || !$valid) fail(422,'login_error');
-            authenticate($user['id']);redirect('/'.$user['username']);
+            authenticate($user['id']);redirect(blog_home_path(owned_blog()));
         });auth_form('login',$error);return;
     }
     if ($path==='/logout') { methods(['POST']);check_csrf();logout();redirect('/'); }
@@ -64,6 +66,7 @@ function platform_home_blog(): ?array {
 }
 function platform_sitemaps(): Generator {
     $home=platform_home_blog();
+    if ($home && blog_prefix($home)==='') { yield ['/sitemap.xml',null];return; }
     if (!$home || $home['visibility']==='public') yield ['/sitemap.xml?home=1',null];
     foreach (query("SELECT u.username,count(p.id) AS posts FROM blogs b JOIN users u ON u.id=b.user_id LEFT JOIN posts p ON p.blog_id=b.id AND p.deleted_at IS NULL WHERE b.visibility='public' GROUP BY b.id ORDER BY b.id") as $blog) {
         $parts=max(1,(int)ceil($blog['posts']/10000));
