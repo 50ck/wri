@@ -6,8 +6,14 @@ function route_admin(string $path): void {
     if ($path==='/admin.php/config') {
         methods(['GET']);
         page('config',function () {
-            echo '<ul class="section-list"><li>'.link_to('/admin.php/config/site','edit_site').'</li><li>'.link_to('/admin.php/config/signups?enabled='.(config()['allow_signups']?'0':'1'),config()['allow_signups']?'close_signups':'allow_signups').'</li></ul>';
+            echo '<ul class="section-list"><li>'.link_to('/admin.php/config/site','edit_site').'</li><li>'.link_to('/admin.php/config/signups?enabled='.(config()['allow_signups']?'0':'1'),config()['allow_signups']?'close_signups':'allow_signups').'</li>';
+            if (config()['homepage']!=='') echo '<li>'.link_to('/admin.php/config/homepage','use_platform_home').'</li>';
+            echo '</ul>';
         },null,$blog);return;
+    }
+    if ($path==='/admin.php/config/homepage') {
+        methods(['GET','POST']);submitted(function () {save_platform_home('');redirect('/admin.php/config',303,'saved');});
+        confirmation('homepage','restore_help','/admin.php/config',$blog);return;
     }
     if ($path==='/admin.php/config/site') {
         methods(['GET','POST']);
@@ -85,8 +91,7 @@ function route_admin(string $path): void {
 
 function admin_users(array $blog,?string $error=null): void {
     page('users',function () use($blog) {
-        $platform=config();$home=$platform['homepage'];
-        if ($home!=='') echo '<ul class="section-list"><li>'.link_to('/admin.php/users/homepage','use_platform_home').'</li></ul>';
+        $home=config()['homepage'];
         $number=input('page',$_GET);
         if ($number!=='' && (!ctype_digit($number) || (int)$number<1 || (int)$number>10000)) fail(400,'invalid');
         $page=max(1,(int)$number);
