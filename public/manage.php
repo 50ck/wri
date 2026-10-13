@@ -9,23 +9,18 @@ function route_manage(string $path): void {
         }
         if (str_starts_with($path,'/manage/addons/')) { addon_route($blog,'manage',explode('/',substr($path,15)));return; }
         if ($path==='/manage/sections') { methods(['GET']);manage_sections($blog);return; }
-        if ($path==='/manage/sections/home/reorder') {
-            methods(['POST']);check_csrf();reorder_section($blog,'home',input('direction'));redirect('/manage/sections',303,'saved');
-        }
-        if ($path==='/manage/sections/home') {
-            methods(['GET','POST']);$error=submitted(function () use($blog) {save_home($blog,input('content'));redirect('/'.$blog['username'],303,'saved');});home_editor($blog,$error);return;
-        }
         if ($path==='/manage/sections/new') {
             methods(['GET','POST']);$error=submitted(function () use($blog) {add_section($blog,input('title'),input('content'));redirect('/manage/sections',303,'section_created');});section_editor($blog,null,$error);return;
         }
-        if (preg_match('~\A/manage/sections/([1-9][0-9]*)/(edit|delete|reorder)\z~',$path,$m)) {
+        if (preg_match('~\A/manage/sections/([1-9][0-9]*)/(edit|delete|reorder|home)\z~',$path,$m)) {
             $section=owned_section($blog,(int)$m[1]);
             if ($m[2]==='edit') {
-                methods(['GET','POST']);$return=input('from',$_GET)==='section'?'/'.$blog['username'].'/'.$section['slug']:'/manage/sections';
+                methods(['GET','POST']);$return=input('from',$_GET)==='section'?section_path($blog,$section):'/manage/sections';
                 $error=submitted(function () use($blog,$section,$return) {edit_section($blog,$section['id'],input('title'),input('content'));redirect($return,303,$return==='/manage/sections'?'saved':null);});
                 section_editor($blog,$section,$error,$return);return;
             }
             if ($m[2]==='delete') { methods(['GET','POST']);submitted(function () use($blog,$section) {delete_section($blog,$section['id']);redirect('/manage/sections',303,'deleted');});confirmation('delete_section','delete_section_help','/manage/sections',$blog);return; }
+            if ($m[2]==='home') { methods(['GET','POST']);submitted(function () use($blog,$section) {set_home_section($blog,$section['id']);redirect('/manage/sections',303,'saved');});confirmation('set_home','restore_help','/manage/sections',$blog);return; }
             methods(['POST']);check_csrf();reorder_section($blog,$section['id'],input('direction'));redirect('/manage/sections',303,'saved');
         }
         if ($path==='/manage/appearance') {
@@ -54,16 +49,17 @@ function section_editor(array $blog,?array $section,?string $error=null,string $
 
 function manage_sections(array $blog): void {
     page('sections',function () use ($blog) {
-        $sections=navigation_sections($blog['id']);echo '<ul class="section-list">';
+        $sections=section_list($blog['id']);$home=home_section($blog)['id']??null;echo '<ul class="section-list">';
         foreach ($sections as $i=>$section) {
             $path='/manage/sections/'.$section['id'];
-            echo '<li><a href="/'.e($blog['username']).($section['slug']!==''?'/'.e($section['slug']):'').'">'.e($section['title']).'</a>';
+            echo '<li><a href="'.e(section_path($blog,$section)).'">'.e($section['title']).'</a>';
             echo ' <form class="inline section-actions" method="post" action="'.$path.'/reorder">';token_field();
             if ($i>0) reorder_button('up');if ($i<count($sections)-1) reorder_button('down');echo '</form>';
-            if ($section['id']==='home') echo ' <span class="section-actions">'.link_to('/manage/sections/home','edit').'</span>';
-            else echo ' <span class="section-actions">'.link_to($path.'/edit','edit').' '.link_to($path.'/delete','delete').'</span>';
+            echo ' <span class="section-actions">'.link_to($path.'/edit','edit').' '.link_to($path.'/delete','delete');
+            if ($section['id']!==$home) echo ' '.link_to($path.'/home','set_home');
+            echo '</span>';
             echo '</li>';
-        } echo '</ul>';if (count($sections)<11) echo link_to('/manage/sections/new','new_section');
+        } echo '</ul>';if (count($sections)<10) echo link_to('/manage/sections/new','new_section');
     },null,$blog);
 }
 
@@ -91,13 +87,6 @@ function manage_settings(array $blog,?string $error=null): void {
 function delete_blog_form(array $blog,?string $error=null): void {
     page('delete_blog',function () {
         echo '<form method="post">';token_field();field('password','password','','password');field('confirmation','type_username',value('confirmation'),'text');echo '<div class="actions">'.link_to('/manage/settings','cancel');button('delete_permanently');echo '</div></form>';
-    },$error,$blog);
-}
-
-function home_editor(array $blog,?string $error=null): void {
-    page('edit_home',function () use ($blog) {
-        echo '<form method="post">';token_field();area('content','content',value('content',$blog['home_markdown']));
-        echo '<div class="actions">';button('save');echo link_to('/'.$blog['username'],'cancel').'</div></form>';
     },$error,$blog);
 }
 

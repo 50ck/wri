@@ -6,8 +6,20 @@ require __DIR__.'/app.php';
 function initialize_database(): void {
     db()->exec('PRAGMA journal_mode = WAL');
     transaction(static function () {
+        if ((int)query('PRAGMA user_version')->fetchColumn()>1) throw new RuntimeException('Database created by a newer version');
+        if (one("SELECT name FROM pragma_table_info('blogs') WHERE name='home_markdown'")) {
+            db()->exec('ALTER TABLE blogs ADD COLUMN home_section_id INTEGER REFERENCES sections(id) ON DELETE SET NULL');
+            db()->exec('DROP TRIGGER IF EXISTS section_limit');
+            foreach (query('SELECT id,home_markdown,home_order,created_at,updated_at FROM blogs')->fetchAll() as $blog) {
+                query('INSERT INTO sections(blog_id,title,slug,content_markdown,sort_order,created_at,updated_at) VALUES (?,?,?,?,?,?,?)',[$blog['id'],t('home'),free_section_slug($blog['id'],t('home')),$blog['home_markdown'],$blog['home_order'],$blog['created_at'],$blog['updated_at']]);
+                query('UPDATE blogs SET home_section_id=? WHERE id=?',[(int)db()->lastInsertId(),$blog['id']]);
+            }
+            db()->exec('ALTER TABLE blogs DROP COLUMN home_markdown');
+            db()->exec('ALTER TABLE blogs DROP COLUMN home_order');
+        }
         db()->exec(initial_schema());
         db()->exec('DROP TABLE IF EXISTS migrations');
+        db()->exec('PRAGMA user_version = 1');
     });
     update_settings(static function (array &$settings) {});
 }
@@ -28,8 +40,7 @@ CREATE TABLE IF NOT EXISTS blogs (
  description TEXT NOT NULL DEFAULT '',
  visibility TEXT NOT NULL DEFAULT 'public' CHECK(visibility IN ('public','private')),
  custom_css TEXT NOT NULL DEFAULT '',
- home_markdown TEXT NOT NULL DEFAULT '',
- home_order INTEGER NOT NULL DEFAULT -2,
+ home_section_id INTEGER REFERENCES sections(id) ON DELETE SET NULL,
  created_at TEXT NOT NULL,
  updated_at TEXT NOT NULL
 );

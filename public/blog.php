@@ -38,7 +38,6 @@ function route_blog(string $path): void {
     methods(['GET']);
     if ($tail===['sitemap.xml']) { blog_sitemap($blog);return; }
     if (!$tail) { render_blog($blog);return; }
-    if ($tail===['inicio']) redirect('/'.$blog['username'],308);
     if ($tail===['style.css']) {
         headers_for($blog);send_header('Content-Type: text/css; charset=utf-8');echo addon_styles($blog).($blog['custom_css'] ?: file_get_contents(__DIR__.'/assets/blog.css'));return;
     }
@@ -74,9 +73,10 @@ function blog_sitemap(array $blog): void {
     }
     sitemap_xml((static function () use($blog,$part) {
         if ($part===1) {
+            $home=home_section($blog);
             if (blog_home_path($blog)!=='/') yield [blog_home_path($blog),$blog['updated_at']];
-            foreach (section_list($blog['id']) as $section) yield ['/'.$blog['username'].'/'.$section['slug'],null];
-            if (has_unsectioned_posts($blog['id'])) yield ['/'.$blog['username'].'/posts',null];
+            foreach (section_list($blog['id']) as $section) if ($section['id']!==($home['id']??null)) yield ['/'.$blog['username'].'/'.$section['slug'],null];
+            if ($home && has_unsectioned_posts($blog['id'])) yield ['/'.$blog['username'].'/posts',null];
         }
         foreach (query('SELECT p.slug,p.updated_at,s.slug AS section_slug FROM posts p LEFT JOIN sections s ON s.id=p.section_id AND s.blog_id=p.blog_id WHERE p.blog_id=? AND p.deleted_at IS NULL ORDER BY p.id LIMIT 10000 OFFSET ?',[$blog['id'],($part-1)*10000]) as $post) yield ['/'.$blog['username'].'/'.($post['section_slug']??'posts').'/'.$post['slug'],$post['updated_at']];
     })());
@@ -95,11 +95,13 @@ function blog_excerpt(string $html): string {
     return '';
 }
 function render_blog(array $blog,?array $section=null,?array $post=null,bool $preview=false): void {
+    $selected=home_section($blog);$blog['home_section_id']=$selected['id']??null;
+    if (!$post && !$section) $section=$selected??['id'=>null,'title'=>t('posts'),'slug'=>'posts','content_markdown'=>''];
     $number=$section && !$post?input('page',$_GET):'';
     if ($number!=='' && (!ctype_digit($number) || (int)$number<1 || (int)$number>10000)) fail(400,'invalid');
     $page=max(1,(int)$number);
     $home=blog_home_path($blog);
-    $path=$post?post_path($blog,$post):($section?'/'.$blog['username'].'/'.$section['slug']:$home);
+    $path=$post?post_path($blog,$post):section_path($blog,$section);
     $posts=[];$more=false;
     if ($section && !$post) {
         $posts=query('SELECT * FROM posts WHERE blog_id=? AND section_id IS ? AND deleted_at IS NULL ORDER BY published_at DESC,id DESC LIMIT 21 OFFSET ?',[$blog['id'],$section['id'],($page-1)*20])->fetchAll();
@@ -107,22 +109,21 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
         if ($number!=='' && ($page===1 || $number!==(string)$page)) redirect($path.($page>1?'?page='.$page:''),308);
         $more=count($posts)>20;$posts=array_slice($posts,0,20);
     }
-    $body=$post ? $post['body_markdown'] : ($section ? $section['content_markdown'] : $blog['home_markdown']);
+    $body=$post?$post['body_markdown']:$section['content_markdown'];
     $html=markdown($body,$blog);
-    $title=$post || $section?($post['title']??$section['title']).' · '.$blog['title']:$blog['title'];
+    $title=($post['title']??$section['title']).' · '.$blog['title'];
     if ($page>1) $title.=' · '.str_replace('{n}',(string)$page,t('page_number'));
-    $description=$post || $section?blog_excerpt($html):$blog['description'];
+    $description=!$post && $path===$home && $blog['description']!==''?$blog['description']:blog_excerpt($html);
     $canonical=config()['base_url'].$path.($page>1?'?page='.$page:'');
     headers_for($blog,$preview); $owner=is_owner($blog) && !$preview;
     echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>'.e($title).'</title>';
     if ($description!=='') echo '<meta name="description" content="'.e($description).'">';
     if (!$preview && $blog['visibility']==='public') echo '<link rel="canonical" href="'.e($canonical).'">';
-    $brandTag=$post || $section?'p':'h1';
-    echo '<link rel="stylesheet" href="/'.e($blog['username']).'/style.css"></head><body class="blog"><header class="blog-header"><'.$brandTag.' class="blog-title"><a href="'.e($home).'">'.e($blog['title']).'</a></'.$brandTag.'>';
+    echo '<link rel="stylesheet" href="/'.e($blog['username']).'/style.css"></head><body class="blog"><header class="blog-header"><p class="blog-title"><a href="'.e($home).'">'.e($blog['title']).'</a></p>';
     if ($blog['description']!=='') echo '<p class="blog-description">'.e($blog['description']).'</p>';
     echo '<nav class="blog-nav" aria-label="'.e(t('sections')).'">';
-    foreach (navigation_sections($blog['id']) as $item) echo '<a href="'.e($item['id']==='home'?$home:'/'.$blog['username'].'/'.$item['slug']).'">'.e($item['title']).'</a> ';
-    if (has_unsectioned_posts($blog['id'])) echo link_to('/'.$blog['username'].'/posts','posts').' ';
+    foreach (section_list($blog['id']) as $item) echo '<a href="'.e(section_path($blog,$item)).'">'.e($item['title']).'</a> ';
+    if (has_unsectioned_posts($blog['id'])) echo link_to(section_path($blog,['id'=>null,'slug'=>'posts']),'posts').' ';
     addon_slot('nav',$blog);
     echo '</nav></header>';
     echo '<main class="blog-main" id="main">';
@@ -130,9 +131,6 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
         echo '<article class="blog-post" itemscope itemtype="https://schema.org/BlogPosting"><link itemprop="mainEntityOfPage" href="'.e($canonical).'"><link itemprop="url" href="'.e($canonical).'"><meta itemprop="dateModified" content="'.e($post['updated_at']).'"><h1 class="blog-post-title" itemprop="headline">'.e($post['title']).'</h1><p><time class="blog-post-date" itemprop="datePublished" datetime="'.e($post['published_at']).'">'.e(substr($post['published_at'],0,10)).'</time><span itemprop="author" itemscope itemtype="https://schema.org/Person"><a itemprop="url" href="'.e(config()['base_url'].$home).'"><span itemprop="name">'.e($blog['username']).'</span></a></span></p><div class="blog-post-body" itemprop="articleBody">'.$html.'</div></article>';
         addon_slot('post_after',$blog,$post);
         if ($owner) { echo '<div class="blog-owner">';icon_link('/'.$blog['username'].'/edit/'.$post['id'],'edit','pencil');icon_link('/'.$blog['username'].'/delete/'.$post['id'],'delete','trash');echo '</div>'; }
-    } elseif (!$section) {
-        echo '<article class="blog-section blog-home">';
-        echo $html.'</article>';
     } else {
         echo '<section class="blog-section"><h1>'.e($section['title']);
         if ($owner) {
@@ -148,7 +146,7 @@ function render_blog(array $blog,?array $section=null,?array $post=null,bool $pr
                 if ($owner) { echo ' ';icon_link('/'.$blog['username'].'/edit/'.$item['id'],'edit','pencil');echo ' ';icon_link('/'.$blog['username'].'/delete/'.$item['id'],'delete','trash'); } echo '</li>';
             } echo '</ul>';
         }
-        $base='/'.$blog['username'].'/'.$section['slug'];
+        $base=section_path($blog,$section);
         echo '<nav aria-label="'.e(t('next')).'">';if ($page>1) echo link_to($base.($page>2?'?page='.($page-1):''),'previous');if ($more) echo ' '.link_to($base.'?page='.($page+1),'next');echo '</nav>';
     }
     if ($owner && isset($_SESSION['flash'])) { echo '<p class="feedback" role="status">'.e(t($_SESSION['flash'])).'</p>'; unset($_SESSION['flash']); }
